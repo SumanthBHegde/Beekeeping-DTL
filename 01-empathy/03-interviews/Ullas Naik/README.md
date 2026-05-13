@@ -1,3 +1,7 @@
-# person-02
+# Ullasa naik
 
-Folder for person-02 interview materials.
+## Profile
+
+- **Age:** 22
+- **Location:** Yellapura
+- **Experience / Scale:** Currently has 8+ bee hives
