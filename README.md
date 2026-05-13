@@ -13,7 +13,9 @@ This is a Design Thinking Lab (DTL) project for the MCA 2nd semester focused on 
 The repository is organized following the Design Thinking methodology with the following phases:
 
 ### 01-empathy/
+
 Research artifacts including:
+
 - Field observations and context notes
 - Survey design and responses
 - User interviews with personas
@@ -21,31 +23,41 @@ Research artifacts including:
 - Key user quotes
 
 ### 02-define/
+
 Synthesis artifacts and problem definition:
+
 - Affinity mapping
 - Problem statements and insights
 
 ### 03-ideate/
+
 Ideation phase deliverables:
+
 - Brainstorming sessions
 - Concept notes
 - Solution selection matrix
 
 ### 03-interviews/
+
 Detailed interview data with individual personas:
+
 - Transcripts
 - Summaries
 - Persona profiles
 - User quotes
 
 ### 04-prototype/
+
 Prototype development artifacts:
+
 - Wireframes
 - Sketches
 - Prototype versions
 
 ### 05-test/
+
 Testing and validation phase:
+
 - Test plans
 - Feedback collection
 - Iteration notes
@@ -64,4 +76,4 @@ This is an academic project. For questions or contributions, please contact the 
 
 ---
 
-*Last Updated: May 2026*
+_Last Updated: May 2026_
