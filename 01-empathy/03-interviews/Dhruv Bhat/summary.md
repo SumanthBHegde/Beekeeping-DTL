@@ -17,3 +17,32 @@
 5. **Material Concerns:** While plastic frames are entering the market, he is currently researching the negative impacts of micro-plastics on honey quality and prefers natural materials.
 
 ---
+
+### **Part 3: POV Empathy Phase Survey (Design Thinking)**
+
+**1. User Persona**
+
+- **Profile:** Commercial/Large-Scale Eco-Beekeeper (~300 boxes).
+- **Environment:** Dense forest/eco-tourism area (Dandeli - heavy monsoons, wildlife interactions).
+- **Motivation:** Efficiency in mass harvesting, maintaining hive health during monsoons, and keeping operations eco-friendly and cost-effective.
+
+**2. Observe (What does the user do?)**
+
+- Harvests honey in bulk using a mechanical centrifuge rather than box-by-box extraction.
+- Relies on traditional pest deterrents (hanging dead wasps).
+- Struggles to feed bees sugar syrup during the monsoon without exposing the hive to cold air.
+- Conducts academic/practical research on the adverse effects of plastics in beekeeping.
+
+**3. Engage (What does the user say/feel? - Quotes & Insights)**
+
+- _"Flow Hives are only for hobbyists. It takes too much time. For 300 boxes, we need to batch process frames in a centrifuge."_
+- _"If you design something new, make it modular. It should fit on top of our existing boxes so we don't have to throw them away."_
+- _"Opening the box in the rainy season ruins the hive's temperature for two days. We need a way to feed them from the outside."_
+- _"Plastic frames are coming into the market, but we are worried about micro-plastics entering the honey."_
+
+**4. Empathize (Pain Points & Frustrations)**
+
+- **Operational Bottlenecks:** Feeding bees in bad weather disrupts hive homeostasis.
+- **Scalability:** Innovations like Flow Hives are too slow and expensive for commercial scale.
+- **Environmental/Health:** The introduction of plastics into beekeeping might compromise the organic nature of the honey.
+- **Cost constraints:** Cannot afford complete system overhauls; solutions must be retrofittable/modular.
