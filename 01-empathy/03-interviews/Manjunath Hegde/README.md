@@ -1,3 +1,7 @@
-# person-03
+# Manjunath Hegde
 
-Folder for person-03 interview materials.
+## Profile
+
+- **Age:** 36
+- **Location:** Sirsi
+- **Experience / Scale:** Currently has 3+ bee hives
