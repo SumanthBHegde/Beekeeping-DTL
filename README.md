@@ -2,95 +2,97 @@
 
 ## File Structure
 
+```text
 Directory structure:
 └── pavannaik2004-beekeeping-dtl/
-├── README.md
-├── 01-empathy/
-│ ├── 00-overview.md
-│ ├── 01-research/
-│ │ ├── context-notes.md
-│ │ ├── field-observation.md
-│ │ ├── important-links.md
-│ │ └── secondary-research.md
-│ ├── 02-survey/
-│ │ ├── bee-questionnaire.md
-│ │ ├── survey-design-notes.md
-│ │ └── responses/
-│ │ ├── Beekeeping Practices and Challenges Survey (Responses).xlsx
-│ │ └── .gitkeep
-│ ├── 03-interviews/
-│ │ ├── interview-index.md
-│ │ ├── Akshay Kedla/
-│ │ │ ├── README.md
-│ │ │ ├── summary.md
-│ │ │ ├── transcript.md
-│ │ │ └── .gitkeep
-│ │ ├── Dhruv Bhat/
-│ │ │ ├── README.md
-│ │ │ ├── summary.md
-│ │ │ └── transcript.md
-│ │ ├── Harsha Hegde/
-│ │ │ ├── README.md
-│ │ │ ├── summary.md
-│ │ │ ├── transcript.md
-│ │ │ └── .gitkeep
-│ │ ├── Manjunath Hegde/
-│ │ │ ├── README.md
-│ │ │ ├── summery.md
-│ │ │ └── transcription.md
-│ │ ├── Pavan/
-│ │ │ ├── README.md
-│ │ │ ├── summary.md
-│ │ │ ├── transcription.md
-│ │ │ └── .gitkeep
-│ │ ├── Sushanth Hegde/
-│ │ │ ├── README.md
-│ │ │ ├── summary.md
-│ │ │ └── transcript.md
-│ │ └── Ullas Naik/
-│ │ ├── README.md
-│ │ ├── summary.md
-│ │ └── transcript.md
-│ ├── 04-empathy-map/
-│ │ └── README.md
-│ ├── 05-personas/
-│ │ └── README.md
-│ ├── 06-pain-points/
-│ │ └── README.md
-│ ├── 07-quotes/
-│ │ └── README.md
-│ └── 08-insights/
-│ └── README.md
-├── 02-define/
-│ ├── 00-overview.md
-│ ├── 02-pain-point-analysis.md
-│ ├── 03-need-statements.md
-│ ├── 04-problem-statement.md
-│ ├── 05-how-might-we.md
-│ ├── 06-scope-decision.md
-│ └── 01-affinity-mapping/
-│ └── README.md
-├── 03-ideate/
-│ ├── brainstorming/
-│ │ └── README.md
-│ ├── concept-notes/
-│ │ └── README.md
-│ └── selection-matrix/
-│ └── README.md
-├── 04-prototype/
-│ ├── prototype-versions/
-│ │ └── README.md
-│ ├── sketches/
-│ │ └── README.md
-│ └── wireframes/
-│ └── README.md
-└── 05-test/
-├── feedback/
-│ └── README.md
-├── iterations/
-│ └── README.md
-└── test-plan/
-└── README.md
+    ├── README.md
+    ├── 01-empathy/
+    │   ├── 00-overview.md
+    │   ├── 01-research/
+    │   │   ├── context-notes.md
+    │   │   ├── field-observation.md
+    │   │   ├── important-links.md
+    │   │   └── secondary-research.md
+    │   ├── 02-survey/
+    │   │   ├── bee-questionnaire.md
+    │   │   ├── survey-design-notes.md
+    │   │   └── responses/
+    │   │       ├── Beekeeping Practices and Challenges Survey  (Responses).xlsx
+    │   │       └── .gitkeep
+    │   ├── 03-interviews/
+    │   │   ├── interview-index.md
+    │   │   ├── Akshay Kedla/
+    │   │   │   ├── README.md
+    │   │   │   ├── summary.md
+    │   │   │   ├── transcript.md
+    │   │   │   └── .gitkeep
+    │   │   ├── Dhruv Bhat/
+    │   │   │   ├── README.md
+    │   │   │   ├── summary.md
+    │   │   │   └── transcript.md
+    │   │   ├── Harsha Hegde/
+    │   │   │   ├── README.md
+    │   │   │   ├── summary.md
+    │   │   │   ├── transcript.md
+    │   │   │   └── .gitkeep
+    │   │   ├── Manjunath Hegde/
+    │   │   │   ├── README.md
+    │   │   │   ├── summery.md
+    │   │   │   └── transcription.md
+    │   │   ├── Pavan/
+    │   │   │   ├── README.md
+    │   │   │   ├── summary.md
+    │   │   │   ├── transcription.md
+    │   │   │   └── .gitkeep
+    │   │   ├── Sushanth Hegde/
+    │   │   │   ├── README.md
+    │   │   │   ├── summary.md
+    │   │   │   └── transcript.md
+    │   │   └── Ullas Naik/
+    │   │       ├── README.md
+    │   │       ├── summary.md
+    │   │       └── transcript.md
+    │   ├── 04-empathy-map/
+    │   │   └── README.md
+    │   ├── 05-personas/
+    │   │   └── README.md
+    │   ├── 06-pain-points/
+    │   │   └── README.md
+    │   ├── 07-quotes/
+    │   │   └── README.md
+    │   └── 08-insights/
+    │       └── README.md
+    ├── 02-define/
+    │   ├── 00-overview.md
+    │   ├── 02-pain-point-analysis.md
+    │   ├── 03-need-statements.md
+    │   ├── 04-problem-statement.md
+    │   ├── 05-how-might-we.md
+    │   ├── 06-scope-decision.md
+    │   └── 01-affinity-mapping/
+    │       └── README.md
+    ├── 03-ideate/
+    │   ├── brainstorming/
+    │   │   └── README.md
+    │   ├── concept-notes/
+    │   │   └── README.md
+    │   └── selection-matrix/
+    │       └── README.md
+    ├── 04-prototype/
+    │   ├── prototype-versions/
+    │   │   └── README.md
+    │   ├── sketches/
+    │   │   └── README.md
+    │   └── wireframes/
+    │       └── README.md
+    └── 05-test/
+        ├── feedback/
+        │   └── README.md
+        ├── iterations/
+        │   └── README.md
+        └── test-plan/
+            └── README.md
+```
 
 ## Project Overview
 
