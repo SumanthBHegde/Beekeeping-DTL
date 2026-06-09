@@ -32,13 +32,13 @@ Each concept is scored on a scale of **1 to 5** (where 5 = Excellent/Perfect Fit
 ## 3. Interpretation & Final Decision
 
 ### Score Breakdown
-- **Top-Tier Concepts (Winners):**
+- **Top-Tier Concepts:**
   - Concept 1: Acrylic inspection window with sliding cover (**21/25**)
   - Concept 2: External sugar syrup feeder with outside refill (**21/25**)
 - **Second-Tier Concepts:**
   - Concept 5: Donut ant/water ring (**18/25**)
   - Concept 3: Clip‑on modular super (**17/25**)
-- **Out of Scope (For this semester):**
+- **Third Tier:**
   - Concept 4: Auto-harvest system (**15/25** - High impact, but extremely low feasibility/high cost)
   - Concept 6: Internal insulation (**15/25** - Important, but indirect to the core inspection problem)
 
