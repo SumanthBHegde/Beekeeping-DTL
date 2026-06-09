@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beehive Prototype — DTL Visualiser (ISI Standard)</title>
+<meta name="description" content="Interactive 3D visualisation of ISI standard beehive with Safe Inspection & Feeding Upgrade" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f5f0e8; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  #canvas-container { width: 100vw; height: 100vh; display: block; position: relative; }
+  canvas { display: block; }
+
+  #ui-panel {
+    position: fixed; bottom: 20px; left: 20px;
+    background: rgba(22,18,14,0.92); border-radius: 16px; padding: 20px;
+    color: #fff; min-width: 280px; max-width: 320px; z-index: 100;
+    backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid rgba(255,200,100,0.12);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 1px 0 rgba(255,200,100,0.06) inset;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  #ui-panel:hover { transform: translateY(-2px); }
+  #ui-panel::-webkit-scrollbar { width: 4px; }
+  #ui-panel::-webkit-scrollbar-thumb { background: rgba(240,192,96,0.3); border-radius: 2px; }
+
+  .panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,200,100,0.15); }
+  .panel-header .hive-icon { width: 28px; height: 28px; background: linear-gradient(135deg, #f0c060, #c87010); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .panel-header h2 { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #f0c060; line-height: 1.3; }
+  .panel-header h2 span { display: block; font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.45); letter-spacing: 0.03em; margin-top: 2px; }
+
+  .btn-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .ctrl-btn {
+    background: rgba(92,48,16,0.6); color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,200,100,0.08); border-radius: 8px;
+    padding: 8px 12px; font-size: 12px; font-weight: 500; cursor: pointer;
+    text-align: left; transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    font-family: inherit; display: flex; align-items: center; gap: 10px;
+    position: relative; overflow: hidden;
+  }
+  .ctrl-btn::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(240,192,96,0.08), transparent); opacity: 0; transition: opacity 0.2s; }
+  .ctrl-btn:hover { background: rgba(122,64,24,0.7); border-color: rgba(255,200,100,0.18); transform: translateX(2px); }
+  .ctrl-btn:hover::before { opacity: 1; }
+  .ctrl-btn:active { transform: translateX(2px) scale(0.98); }
+  .ctrl-btn .toggle-track { width: 32px; height: 16px; border-radius: 8px; background: rgba(90,64,48,0.8); flex-shrink: 0; position: relative; transition: background 0.3s; border: 1px solid rgba(255,200,100,0.1); }
+  .ctrl-btn .toggle-track .toggle-thumb { width: 12px; height: 12px; border-radius: 50%; background: rgba(180,140,100,0.6); position: absolute; top: 1px; left: 1px; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  .ctrl-btn.active .toggle-track { background: rgba(200,135,16,0.5); border-color: rgba(240,192,96,0.3); }
+  .ctrl-btn.active .toggle-track .toggle-thumb { left: 17px; background: #f0c060; box-shadow: 0 0 8px rgba(240,192,96,0.5); }
+  .ctrl-btn .btn-label { flex: 1; pointer-events: none; }
+
+  .dim-block { border-top: 1px solid rgba(255,200,100,0.1); padding-top: 12px; margin-top: 4px; }
+  .dim-block h3 { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(192,160,96,0.8); margin-bottom: 8px; }
+  .dim-block ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+  .dim-block li { font-size: 11px; color: rgba(255,255,255,0.6); display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .dim-block li .label { color: rgba(255,255,255,0.5); }
+  .dim-block li .value { color: rgba(255,255,255,0.35); font-size: 10px; font-weight: 500; }
+
+  #tooltip { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-4px); background: rgba(22,18,14,0.88); color: #f0c060; font-size: 12px; font-weight: 500; padding: 8px 18px; border-radius: 24px; pointer-events: none; opacity: 0; transition: opacity 0.4s, transform 0.4s; z-index: 200; backdrop-filter: blur(8px); border: 1px solid rgba(255,200,100,0.1); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+  #tooltip.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #hover-label { position: fixed; pointer-events: none; background: rgba(22,18,14,0.85); color: #f0c060; font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 6px; opacity: 0; transition: opacity 0.15s; z-index: 150; backdrop-filter: blur(6px); border: 1px solid rgba(255,200,100,0.1); white-space: nowrap; letter-spacing: 0.03em; text-transform: uppercase; }
+
+  #loading { position: fixed; inset: 0; background: #f5f0e8; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.6s; }
+  #loading.fade { opacity: 0; pointer-events: none; }
+  #loading .spinner { width: 40px; height: 40px; border: 3px solid rgba(200,135,16,0.2); border-top-color: #c87010; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+  #loading p { color: #8b5e3c; font-size: 13px; font-weight: 500; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #camera-presets { position: fixed; top: 20px; right: 20px; display: flex; gap: 6px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
+  .cam-btn { background: rgba(22,18,14,0.75); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,200,100,0.1); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.2s; backdrop-filter: blur(8px); }
+  .cam-btn:hover { background: rgba(92,48,16,0.8); color: #f0c060; border-color: rgba(255,200,100,0.25); transform: translateY(-1px); }
+  .cam-btn.active-cam { background: rgba(200,135,16,0.3); color: #f0c060; border-color: rgba(240,192,96,0.3); }
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><p>Building beehive…</p></div>
+<script>
+window.__loadingDismissed=false;
+function dismissLoading(){if(window.__loadingDismissed)return;window.__loadingDismissed=true;var el=document.getElementById('loading');if(el){el.classList.add('fade');setTimeout(function(){if(el&&el.parentNode)el.remove()},700)}}
+setTimeout(dismissLoading,10000);
+</script>
+
+<div id="canvas-container"></div>
+
+<div id="ui-panel">
+  <div class="panel-header">
+    <div class="hive-icon">🐝</div>
+    <h2>ISI Standard Beehive<span>DTL Visualiser · Inspection & Feeding Upgrade</span></h2>
+  </div>
+  <div class="btn-group">
+    <button class="ctrl-btn" id="btn-shutter"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Open Shutter</span></button>
+    <button class="ctrl-btn" id="btn-harvest"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Activate Harvest</span></button>
+    <button class="ctrl-btn" id="btn-feeder"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Show Feeding</span></button>
+    <button class="ctrl-btn active" id="btn-xps"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Insulation</span></button>
+    <button class="ctrl-btn active" id="btn-super"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Flow Super</span></button>
+    <button class="ctrl-btn active" id="btn-frames"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Flow Frames</span></button>
+    <button class="ctrl-btn active" id="btn-feeder-vis"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Feeder</span></button>
+    <button class="ctrl-btn active" id="btn-roof"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Roof</span></button>
+    <button class="ctrl-btn" id="btn-explode"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Exploded View</span></button>
+  </div>
+  <div class="dim-block">
+    <h3>ISI Standard Dimensions</h3>
+    <ul>
+      <li><span class="label">Brood box (ext.)</span><span class="value">505 × 405 × 245 mm</span></li>
+      <li><span class="label">Brood box (int.)</span><span class="value">465 × 365 × 245 mm</span></li>
+      <li><span class="label">Super (ext.)</span><span class="value">505 × 405 × 150 mm</span></li>
+      <li><span class="label">Wall</span><span class="value">20 mm</span></li>
+      <li><span class="label">Insulation</span><span class="value">10 mm (inner)</span></li>
+      <li><span class="label">Bee space</span><span class="value">9 mm</span></li>
+      <li><span class="label">Left window</span><span class="value">200 × 140 mm</span></li>
+      <li><span class="label">Back window</span><span class="value">180 × 120 mm</span></li>
+      <li><span class="label">Flow frame</span><span class="value">340 × 48 × 140 mm</span></li>
+      <li><span class="label">Brood box</span><span class="value">Empty (no frames)</span></li>
+    </ul>
+  </div>
+</div>
+
+<div id="camera-presets">
+  <button class="cam-btn active-cam" id="cam-default">Default</button>
+  <button class="cam-btn" id="cam-front">Front</button>
+  <button class="cam-btn" id="cam-back">Back</button>
+  <button class="cam-btn" id="cam-left">Left</button>
+  <button class="cam-btn" id="cam-top">Top</button>
+  <button class="cam-btn" id="cam-window">Window</button>
+  <button class="cam-btn" id="cam-orbit">Orbit</button>
+</div>
+
+<div id="tooltip">Use mouse to orbit · scroll to zoom · right-click to pan</div>
+<div id="hover-label"></div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+try {
+
+// ============================================================
+// ISI STANDARD DIMENSIONS
+// ============================================================
+const FLOOR_W = 555, FLOOR_D = 455, FLOOR_T = 20;
+const LANDING_EXT = 60;
+
+const BROOD_W = 505, BROOD_D = 405, BROOD_H = 245, WALL = 20;
+const ENTRANCE_W = 365, ENTRANCE_H = 10;
+const BEE_SPACE = 9;
+
+// Insulation — INSIDE the box, thin
+const INSUL_T = 10;
+
+// Queen excluder
+const QE_T = 3;
+
+// Super
+const SUPER_W = 505, SUPER_D = 405, SUPER_H = 150;
+
+// Inner cover
+const COVER_T = 10;
+
+// Telescoping roof
+const ROOF_W = 535, ROOF_D = 435, ROOF_H = 70;
+const TIN_T = 2;
+
+// Inspection window — LEFT WALL, bigger
+const WIN_W = 200, WIN_H = 140, WIN_FROM_BOTTOM = 55;
+const ACRYLIC_T = 5, RECESS_D = 12;
+const SHUTTER_T = 3, CHANNEL_W = 4, CHANNEL_OVERHANG = 10;
+const SHUTTER_TRAVEL = 150;
+const STOP_PIN_R = 1.5;
+
+// Back inspection window
+const BWIN_W = 180, BWIN_H = 120, BWIN_FROM_BOTTOM = 65;
+const BWIN_OFFSET_X = 80; // offset to right side of back wall
+
+// Top feeder (funnel + internal line on super)
+const FUNNEL_R_TOP = 25, FUNNEL_R_BOT = 8, FUNNEL_H = 40;
+const FEED_TUBE_R = 6, FEED_TUBE_L = 80;
+const FEEDER_TRAY_W = 120, FEEDER_TRAY_D = 60, FEEDER_TRAY_H = 20;
+
+// Flow frames — SHORTER length
+const FF_W = 48, FF_L = 340, FF_H = 140;
+const NUM_FF = 7;
+const HARVEST_SPOUT_R = 6;
+
+// Traditional brood frames
+// Brood box is kept empty (no frames)
+
+// Y stack
+const Y_FLOOR = 0;
+const Y_BROOD = FLOOR_T;
+const Y_QE = Y_BROOD + BROOD_H;
+const Y_SUPER = Y_QE + QE_T;
+const Y_COVER = Y_SUPER + SUPER_H;
+const Y_ROOF = Y_COVER + COVER_T;
+
+// ============================================================
+// STATE
+// ============================================================
+let shutterOpen = false, harvestMode = false, feederActive = false;
+let xpsVisible = true, superVisible = true, roofVisible = true;
+let framesVisible = true, feederVisible = true;
+let explodedView = false;
+let autoRotate = false;
+
+let shutterPos = 0, shutterTarget = 0;
+let harvestShift = 0, harvestTarget = 0;
+let explodeP = 0, explodeT = 0;
+
+let cameraAnimating = false, cameraT = 0;
+const cameraFrom = new THREE.Vector3(), cameraTo = new THREE.Vector3();
+const camTargetFrom = new THREE.Vector3(), camTargetTo = new THREE.Vector3();
+
+let shutterMesh = null, shutterBaseY = 0;
+let frameBottomHalves = [], drainageChannels = [], flowKey = null;
+let xpsGroup = null, superGroup = null, roofGroup = null;
+let feederGroup = null, flowFrameGroup = null;
+let honeyParticles = [];
+let syrupParticles = [];
+
+const moduleGroups = {};
+const moduleNames = { floor:'Floor Board', brood:'Brood Box', window:'Inspection Window', feeder:'Top Feeder', xps:'Insulation', super:'Flow Super', roof:'Roof' };
+const explodeOffsets = {
+  floor: new THREE.Vector3(0,-80,0),
+  brood: new THREE.Vector3(0,0,0),
+  window: new THREE.Vector3(-160,0,0),
+  feeder: new THREE.Vector3(200,150,0),
+  xps: new THREE.Vector3(180,0,0),
+  super: new THREE.Vector3(0,100,0),
+  roof: new THREE.Vector3(0,200,0)
+};
+
+// ============================================================
+// RENDERER + SCENE
+// ============================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+try { renderer.outputColorSpace = THREE.SRGBColorSpace; } catch(e){}
+try { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1; } catch(e){}
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#f5f0e8');
+scene.fog = new THREE.Fog(0xf5f0e8, 2500, 4500);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 1, 5000);
+camera.position.set(750, 450, 700);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 200, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 200;
+controls.maxDistance = 2500;
+controls.update();
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xd0c4a0, 0.35));
+scene.add(new THREE.HemisphereLight(0xffe8c0, 0xc0a880, 0.4));
+const sun = new THREE.DirectionalLight(0xffe8c0, 1.6);
+sun.position.set(600,900,400); scene.add(sun);
+const fill = new THREE.DirectionalLight(0xfff0d8, 0.2);
+fill.position.set(-400,200,-300); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffd080, 0.3);
+rim.position.set(-200,400,600); scene.add(rim);
+
+// ============================================================
+// MATERIALS
+// ============================================================
+function M(c,r,m,o){r=r!=null?r:0.7;m=m!=null?m:0.05;o=o||{};return new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:r,metalness:m},o))}
+
+function woodTex(base,grain){
+  var c=document.createElement('canvas');c.width=256;c.height=128;
+  var x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,256,128);
+  x.globalAlpha=0.15;x.strokeStyle=grain;
+  for(var i=0;i<50;i++){x.beginPath();x.lineWidth=0.5+Math.random()*1.5;var y=Math.random()*128;x.moveTo(0,y);for(var j=0;j<256;j+=10)x.lineTo(j,y+Math.sin(j*0.02+i)*3+(Math.random()-0.5)*2);x.stroke()}
+  x.globalAlpha=1;var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
+}
+
+const MC = new THREE.MeshStandardMaterial({color:0x8b5e3c,roughness:0.8,metalness:0.02,map:woodTex('#8b5e3c','#5a3a20')});
+const MCL = new THREE.MeshStandardMaterial({color:0xa06835,roughness:0.75,metalness:0.02,map:woodTex('#a06835','#704a22')});
+const MFL = M(0x7a5030,0.85);
+const MMDF = M(0x6b4a28,0.75);
+const MMDF_DK = M(0x4a3520,0.8);
+const MACR = M(0xb8d4e8,0.08,0.05,{transparent:true,opacity:0.5,depthWrite:false});
+const MXPS = M(0xd8ddd0,0.9,0.02);
+const MGHOST = M(0x8b5e3c,0.8,0.05,{transparent:true,opacity:0.08,depthWrite:false});
+const MSF = M(0xa06835,0.75,0.05,{transparent:true,opacity:0.15,depthWrite:false});
+const MSTEEL = M(0xb0b8c0,0.3,0.4);
+const MGOLD = M(0xc8a040,0.3,0.5);
+const MSHUT = M(0x3a3a3a,0.6,0.1);
+const MDARK = M(0x222222,0.8);
+const MAMB = M(0xe0a030,0.5);
+const MWAX = M(0xf0e080,0.6);
+const MATRF = M(0xc87010,0.5);
+const MWDK = M(0x5c3010,0.85);
+const MTIN = M(0xc0c0c0,0.2,0.6);
+const MCOV = M(0x7a5535,0.8);
+const MSIL = M(0x909090,0.4,0.0);
+const MBEE = M(0xf0c040,0.4,0.0,{transparent:true,opacity:0.35,depthWrite:false});
+const MBOTTLE = M(0xd0e8f0,0.1,0.0,{transparent:true,opacity:0.4,depthWrite:false});
+const MSYRUP = M(0xe8c060,0.15,0.0,{transparent:true,opacity:0.5,depthWrite:false});
+const MFK = M(0xc8a040,0.3,0.5);
+const MKS = M(0x222222,0.9);
+const MHDPE = M(0xf0ede0,0.5);
+
+// Frame wood (light, for brood frames)
+const MFRAME = M(0x9a7040,0.7);
+
+// ============================================================
+// MODULE 1 — FLOOR BOARD
+// ============================================================
+function createFloorBoard(){
+  var g=new THREE.Group(); g.name='floor';
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(FLOOR_W,FLOOR_T,FLOOR_D),MFL).translateY(Y_FLOOR+FLOOR_T/2));
+  // Landing board
+  var land=new THREE.Mesh(new THREE.BoxGeometry(ENTRANCE_W+60,FLOOR_T*0.6,LANDING_EXT),MFL);
+  land.position.set(0,Y_FLOOR+FLOOR_T*0.3,BROOD_D/2+LANDING_EXT/2);
+  land.rotation.x=0.05;
+  g.add(land);
+  // Edge
+  var e=new THREE.EdgesGeometry(new THREE.BoxGeometry(FLOOR_W,FLOOR_T,FLOOR_D));
+  g.add(new THREE.LineSegments(e,new THREE.LineBasicMaterial({color:0x5a3a20,opacity:0.3,transparent:true})).translateY(Y_FLOOR+FLOOR_T/2));
+  scene.add(g); moduleGroups.floor=g;
+}
+
+// ============================================================
+// MODULE 2 — BROOD BOX (empty — no frames)
+// ============================================================
+function createBroodBox(){
+  var g=new THREE.Group(); g.name='brood';
+
+  // Back wall
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W,BROOD_H,WALL),MC).translateY(Y_BROOD+BROOD_H/2).translateZ(-BROOD_D/2+WALL/2));
+  // Left wall
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,BROOD_H,BROOD_D),MC).translateX(-BROOD_W/2+WALL/2).translateY(Y_BROOD+BROOD_H/2));
+  // Right wall
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,BROOD_H,BROOD_D),MC).translateX(BROOD_W/2-WALL/2).translateY(Y_BROOD+BROOD_H/2));
+  // Front — ghost with entrance cutout
+  var sideW=(BROOD_W-ENTRANCE_W)/2;
+  if(sideW>0){
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(sideW,ENTRANCE_H,WALL),MGHOST).translateX(-BROOD_W/2+sideW/2).translateY(Y_BROOD+ENTRANCE_H/2).translateZ(BROOD_D/2-WALL/2));
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(sideW,ENTRANCE_H,WALL),MGHOST).translateX(BROOD_W/2-sideW/2).translateY(Y_BROOD+ENTRANCE_H/2).translateZ(BROOD_D/2-WALL/2));
+  }
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W,BROOD_H-ENTRANCE_H,WALL),MGHOST).translateY(Y_BROOD+ENTRANCE_H+(BROOD_H-ENTRANCE_H)/2).translateZ(BROOD_D/2-WALL/2));
+
+  // Handles
+  var hg=new THREE.BoxGeometry(4,20,80);
+  var hm=M(0x6a4a2a,0.75);
+  g.add(new THREE.Mesh(hg,hm).translateX(-BROOD_W/2-2).translateY(Y_BROOD+BROOD_H/2));
+  g.add(new THREE.Mesh(hg,hm).translateX(BROOD_W/2+2).translateY(Y_BROOD+BROOD_H/2));
+
+  // Queen excluder on top
+  var qeCanvas=document.createElement('canvas');qeCanvas.width=256;qeCanvas.height=256;
+  var qc=qeCanvas.getContext('2d');qc.fillStyle='rgba(160,160,160,0.3)';qc.fillRect(0,0,256,256);
+  qc.strokeStyle='rgba(180,180,180,0.6)';qc.lineWidth=1;
+  for(var x=0;x<256;x+=6){qc.beginPath();qc.moveTo(x,0);qc.lineTo(x,256);qc.stroke()}
+  var qeM=new THREE.MeshStandardMaterial({map:new THREE.CanvasTexture(qeCanvas),color:0xa0a0a0,roughness:0.3,metalness:0.4,transparent:true,opacity:0.6});
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W-2*WALL+10,QE_T,BROOD_D-2*WALL+10),qeM).translateY(Y_QE+QE_T/2));
+
+  // Edge wireframe
+  var eg=new THREE.EdgesGeometry(new THREE.BoxGeometry(BROOD_W,BROOD_H,BROOD_D));
+  g.add(new THREE.LineSegments(eg,new THREE.LineBasicMaterial({color:0x6b4020,opacity:0.35,transparent:true})).translateY(Y_BROOD+BROOD_H/2));
+
+  scene.add(g); moduleGroups.brood=g;
+}
+
+// ============================================================
+// MODULE 3 — INSULATION (INSIDE brood box walls, thin)
+// ============================================================
+function createInsulation(){
+  var g=new THREE.Group(); g.name='xps';
+  var iy = Y_BROOD + BROOD_H/2;
+  // Left inner wall
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(INSUL_T,BROOD_H-4,BROOD_D-2*WALL),MXPS).translateX(-BROOD_W/2+WALL+INSUL_T/2).translateY(iy));
+  // Right inner wall
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(INSUL_T,BROOD_H-4,BROOD_D-2*WALL),MXPS).translateX(BROOD_W/2-WALL-INSUL_T/2).translateY(iy));
+  // Back inner wall
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W-2*WALL-2*INSUL_T,BROOD_H-4,INSUL_T),MXPS).translateZ(-BROOD_D/2+WALL+INSUL_T/2).translateY(iy));
+  // NO front insulation — removed for ventilation / entrance access
+
+  scene.add(g); xpsGroup=g; moduleGroups.xps=g;
+}
+
+// ============================================================
+// MODULE 4 — INSPECTION WINDOWS (LEFT WALL + BACK WALL)
+// ============================================================
+var backShutterMesh = null, backShutterBaseZ = 0;
+
+function createWindowAssembly(){
+  var g=new THREE.Group(); g.name='window';
+
+  // ========== LEFT WALL WINDOW ==========
+  var faceX = -BROOD_W/2;
+  var winCZ = 0;
+  var winMY = Y_BROOD + WIN_FROM_BOTTOM + WIN_H/2;
+
+  // Recess frame (MDF)
+  var rW = RECESS_D;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,rW,WIN_W+2*rW),MMDF).translateX(faceX+WALL/2).translateY(winMY+WIN_H/2+rW/2).translateZ(winCZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,rW,WIN_W+2*rW),MMDF).translateX(faceX+WALL/2).translateY(winMY-WIN_H/2-rW/2).translateZ(winCZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,WIN_H,rW),MMDF).translateX(faceX+WALL/2).translateY(winMY).translateZ(winCZ+WIN_W/2+rW/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,WIN_H,rW),MMDF).translateX(faceX+WALL/2).translateY(winMY).translateZ(winCZ-WIN_W/2-rW/2));
+
+  // Acrylic panel
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ACRYLIC_T,WIN_H,WIN_W),MACR).translateX(faceX-ACRYLIC_T/2).translateY(winMY).translateZ(winCZ));
+
+  // Bee-space indicator
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(1,WIN_H-4,WIN_W-4),MBEE).translateX(faceX+WALL+BEE_SPACE).translateY(winMY).translateZ(winCZ));
+
+  // Bee-space label
+  var lc=document.createElement('canvas');lc.width=256;lc.height=64;
+  var lx=lc.getContext('2d');lx.fillStyle='rgba(0,0,0,0)';lx.fillRect(0,0,256,64);
+  lx.fillStyle='#f0c040';lx.font='bold 20px Inter,system-ui';lx.textAlign='center';
+  lx.fillText('BEE SPACE 9mm',128,38);
+  var ls=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(lc),transparent:true,opacity:0.7,depthTest:false}));
+  ls.position.set(faceX+WALL+BEE_SPACE+5,winMY,winCZ); ls.scale.set(60,15,1); g.add(ls);
+
+  // Shutter channels
+  var chanTotal = WIN_W + 2*CHANNEL_OVERHANG;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(15,CHANNEL_W,chanTotal),MMDF_DK).translateX(faceX-15/2).translateY(winMY+WIN_H/2+CHANNEL_W/2).translateZ(winCZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(15,CHANNEL_W,chanTotal),MMDF_DK).translateX(faceX-15/2).translateY(winMY-WIN_H/2-CHANNEL_W/2).translateZ(winCZ));
+
+  // Sliding shutter (slides along Z)
+  var sm = new THREE.Mesh(new THREE.BoxGeometry(SHUTTER_T, WIN_H+CHANNEL_OVERHANG, chanTotal), MSHUT);
+  shutterBaseY = winMY;
+  sm.position.set(faceX - SHUTTER_T/2 - 1, winMY, winCZ); g.add(sm);
+  shutterMesh = sm;
+
+  // Handle
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(4,8,30),M(0x555555,0.5,0.2)).translateX(faceX-SHUTTER_T-3).translateY(winMY).translateZ(winCZ+WIN_W/2-20));
+  // Stop pin
+  var pin=new THREE.Mesh(new THREE.CylinderGeometry(STOP_PIN_R,STOP_PIN_R,25,12),MGOLD);
+  pin.rotation.x=Math.PI/2; pin.position.set(faceX-4, winMY+WIN_H/2+CHANNEL_W, winCZ-WIN_W/2-CHANNEL_OVERHANG+4); g.add(pin);
+  // Silicone bead
+  var bT=5,bD=2,bX=faceX-1;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bD,bT,WIN_W+bT),MSIL).translateX(bX).translateY(winMY+WIN_H/2+bT/2).translateZ(winCZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bD,bT,WIN_W+bT),MSIL).translateX(bX).translateY(winMY-WIN_H/2-bT/2).translateZ(winCZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bD,WIN_H,bT),MSIL).translateX(bX).translateY(winMY).translateZ(winCZ+WIN_W/2+bT/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bD,WIN_H,bT),MSIL).translateX(bX).translateY(winMY).translateZ(winCZ-WIN_W/2-bT/2));
+
+  // ========== BACK WALL WINDOW ==========
+  var bfaceZ = -BROOD_D/2;
+  var bwinCX = BWIN_OFFSET_X;
+  var bwinMY = Y_BROOD + BWIN_FROM_BOTTOM + BWIN_H/2;
+
+  // Recess frame (back wall — flat on Z face)
+  var brW = RECESS_D;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BWIN_W+2*brW,brW,WALL),MMDF).translateX(bwinCX).translateY(bwinMY+BWIN_H/2+brW/2).translateZ(bfaceZ+WALL/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BWIN_W+2*brW,brW,WALL),MMDF).translateX(bwinCX).translateY(bwinMY-BWIN_H/2-brW/2).translateZ(bfaceZ+WALL/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(brW,BWIN_H,WALL),MMDF).translateX(bwinCX-BWIN_W/2-brW/2).translateY(bwinMY).translateZ(bfaceZ+WALL/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(brW,BWIN_H,WALL),MMDF).translateX(bwinCX+BWIN_W/2+brW/2).translateY(bwinMY).translateZ(bfaceZ+WALL/2));
+
+  // Acrylic panel (back)
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BWIN_W,BWIN_H,ACRYLIC_T),MACR).translateX(bwinCX).translateY(bwinMY).translateZ(bfaceZ-ACRYLIC_T/2));
+
+  // Bee-space indicator (back)
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BWIN_W-4,BWIN_H-4,1),MBEE).translateX(bwinCX).translateY(bwinMY).translateZ(bfaceZ+WALL+BEE_SPACE));
+
+  // Back shutter channels (top & bottom, on outer back face)
+  var bchanTotal = BWIN_W + 2*CHANNEL_OVERHANG;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bchanTotal,CHANNEL_W,15),MMDF_DK).translateX(bwinCX).translateY(bwinMY+BWIN_H/2+CHANNEL_W/2).translateZ(bfaceZ-15/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bchanTotal,CHANNEL_W,15),MMDF_DK).translateX(bwinCX).translateY(bwinMY-BWIN_H/2-CHANNEL_W/2).translateZ(bfaceZ-15/2));
+
+  // Back sliding shutter (slides in X direction along back wall)
+  var bsm = new THREE.Mesh(new THREE.BoxGeometry(bchanTotal, BWIN_H+CHANNEL_OVERHANG, SHUTTER_T), MSHUT);
+  backShutterBaseZ = bfaceZ - SHUTTER_T/2 - 1;
+  bsm.position.set(bwinCX, bwinMY, backShutterBaseZ); g.add(bsm);
+  backShutterMesh = bsm;
+
+  // Back handle
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(30,8,4),M(0x555555,0.5,0.2)).translateX(bwinCX+BWIN_W/2-20).translateY(bwinMY).translateZ(bfaceZ-SHUTTER_T-3));
+  // Back stop pin
+  var bpin=new THREE.Mesh(new THREE.CylinderGeometry(STOP_PIN_R,STOP_PIN_R,25,12),MGOLD);
+  bpin.rotation.z=Math.PI/2; bpin.position.set(bwinCX-BWIN_W/2-CHANNEL_OVERHANG+4, bwinMY+BWIN_H/2+CHANNEL_W, bfaceZ-4); g.add(bpin);
+  // Back silicone bead
+  var bbZ=bfaceZ-1;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BWIN_W+bT,bT,bD),MSIL).translateX(bwinCX).translateY(bwinMY+BWIN_H/2+bT/2).translateZ(bbZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(BWIN_W+bT,bT,bD),MSIL).translateX(bwinCX).translateY(bwinMY-BWIN_H/2-bT/2).translateZ(bbZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bT,BWIN_H,bD),MSIL).translateX(bwinCX-BWIN_W/2-bT/2).translateY(bwinMY).translateZ(bbZ));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(bT,BWIN_H,bD),MSIL).translateX(bwinCX+BWIN_W/2+bT/2).translateY(bwinMY).translateZ(bbZ));
+
+  scene.add(g); moduleGroups.window=g;
+}
+
+// ============================================================
+// MODULE 5 — TOP FEEDER (funnel outside super → internal tray)
+// ============================================================
+function createFeeder(){
+  var g=new THREE.Group(); g.name='feeder';
+
+  // Funnel sits on outside of super, right side, ABOVE the frames
+  var funnelX = SUPER_W/2 + FUNNEL_R_TOP + 5;
+  var funnelY = Y_SUPER + SUPER_H + 15;
+
+  // Funnel cone
+  var funnel = new THREE.Mesh(
+    new THREE.CylinderGeometry(FUNNEL_R_BOT, FUNNEL_R_TOP, FUNNEL_H, 24, 1, true),
+    M(0xd0d0d0, 0.2, 0.3, {side: THREE.DoubleSide})
+  );
+  funnel.position.set(funnelX, funnelY + FUNNEL_H/2, 0);
+  g.add(funnel);
+
+  // Funnel rim
+  var fRim = new THREE.Mesh(new THREE.TorusGeometry(FUNNEL_R_TOP, 2, 8, 24), MSTEEL);
+  fRim.rotation.x = Math.PI/2;
+  fRim.position.set(funnelX, funnelY + FUNNEL_H, 0);
+  g.add(fRim);
+
+  // Funnel bottom cap (visual)
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(FUNNEL_R_BOT, FUNNEL_R_BOT, 3, 16), MSTEEL).translateX(funnelX).translateY(funnelY));
+
+  // Feed tube going through super wall into internal tray
+  var tube = new THREE.Mesh(new THREE.CylinderGeometry(FEED_TUBE_R, FEED_TUBE_R, FEED_TUBE_L, 12), MSTEEL);
+  tube.rotation.z = Math.PI/2;
+  tube.position.set(SUPER_W/2 - FEED_TUBE_L/2 + WALL, funnelY - 5, 0);
+  g.add(tube);
+
+  // Bracket holding funnel to super wall
+  var bracket = new THREE.Mesh(new THREE.BoxGeometry(30, 3, 40), MSTEEL);
+  bracket.position.set(SUPER_W/2 + 15, funnelY - 10, 0);
+  g.add(bracket);
+  var bracketV = new THREE.Mesh(new THREE.BoxGeometry(3, 30, 40), MSTEEL);
+  bracketV.position.set(SUPER_W/2 + 1.5, funnelY - 25, 0);
+  g.add(bracketV);
+
+  // Internal feeder tray (inside super, ABOVE flow frames near top)
+  var trayX = SUPER_W/2 - WALL - FEEDER_TRAY_W/2 - 5;
+  var trayY = Y_SUPER + SUPER_H - FEEDER_TRAY_H + 5;
+  // Tray walls
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(FEEDER_TRAY_W, 2, FEEDER_TRAY_D), MHDPE).translateX(trayX).translateY(trayY).translateZ(0));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(2, FEEDER_TRAY_H, FEEDER_TRAY_D), MHDPE).translateX(trayX-FEEDER_TRAY_W/2+1).translateY(trayY+FEEDER_TRAY_H/2).translateZ(0));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(2, FEEDER_TRAY_H, FEEDER_TRAY_D), MHDPE).translateX(trayX+FEEDER_TRAY_W/2-1).translateY(trayY+FEEDER_TRAY_H/2).translateZ(0));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(FEEDER_TRAY_W, FEEDER_TRAY_H, 2), MHDPE).translateX(trayX).translateY(trayY+FEEDER_TRAY_H/2).translateZ(-FEEDER_TRAY_D/2+1));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(FEEDER_TRAY_W, FEEDER_TRAY_H, 2), MHDPE).translateX(trayX).translateY(trayY+FEEDER_TRAY_H/2).translateZ(FEEDER_TRAY_D/2-1));
+
+  // Syrup fill inside tray (rises when feeder active)
+  var syrupFill = new THREE.Mesh(new THREE.BoxGeometry(FEEDER_TRAY_W-6, FEEDER_TRAY_H*0.6, FEEDER_TRAY_D-6), MSYRUP);
+  syrupFill.position.set(trayX, trayY+FEEDER_TRAY_H*0.3+2, 0);
+  syrupFill.userData.baseScaleY = 1;
+  syrupFill.userData.tag = 'syrupFill';
+  g.add(syrupFill);
+
+  // Create syrup drip particles (hidden initially)
+  for(var sp=0;sp<8;sp++){
+    var droplet = new THREE.Mesh(
+      new THREE.SphereGeometry(2+Math.random()*1.5, 8, 8),
+      new THREE.MeshStandardMaterial({color:0xe8c060, roughness:0.15, transparent:true, opacity:0.7, metalness:0.05})
+    );
+    droplet.visible = false;
+    droplet.userData = {
+      startX: funnelX,
+      startY: funnelY,
+      endX: trayX,
+      endY: trayY + FEEDER_TRAY_H,
+      tubeY: funnelY - 5,
+      tubeStartX: SUPER_W/2 + WALL,
+      tubeEndX: trayX + FEEDER_TRAY_W/2,
+      phase: 0,
+      speed: 0.3 + Math.random()*0.3,
+      delay: sp * 0.25,
+      elapsed: 0
+    };
+    droplet.position.set(funnelX, funnelY, 0);
+    g.add(droplet);
+    syrupParticles.push(droplet);
+  }
+
+  scene.add(g); moduleGroups.feeder=g;
+}
+
+// ============================================================
+// MODULE 6 — FLOW HIVE SUPER (harvest from FRONT)
+// ============================================================
+function createFlowSuper(){
+  var g=new THREE.Group(); g.name='super';
+
+  // Walls
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(SUPER_W,SUPER_H,WALL),MCL).translateY(Y_SUPER+SUPER_H/2).translateZ(-SUPER_D/2+WALL/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,SUPER_H,SUPER_D),MCL).translateX(-SUPER_W/2+WALL/2).translateY(Y_SUPER+SUPER_H/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,SUPER_H,SUPER_D),MCL).translateX(SUPER_W/2-WALL/2).translateY(Y_SUPER+SUPER_H/2));
+  // Front — ghost so frames visible, but also has harvest outlet
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(SUPER_W,SUPER_H,WALL),MSF).translateY(Y_SUPER+SUPER_H/2).translateZ(SUPER_D/2-WALL/2));
+
+  // Handles
+  var sg=new THREE.BoxGeometry(4,18,70);var sm_h=M(0x7a5030,0.75);
+  g.add(new THREE.Mesh(sg,sm_h).translateX(-SUPER_W/2-2).translateY(Y_SUPER+SUPER_H/2));
+  g.add(new THREE.Mesh(sg,sm_h).translateX(SUPER_W/2+2).translateY(Y_SUPER+SUPER_H/2));
+
+  // Flow frames — put in a sub-group for independent toggling
+  var ffGroup = new THREE.Group();
+  ffGroup.name = 'flowframes';
+  var totalFS=NUM_FF*FF_W+(NUM_FF+1)*BEE_SPACE;
+  var startX=-totalFS/2+BEE_SPACE+FF_W/2;
+  var frameMidY=Y_SUPER+(SUPER_H-FF_H)/2+FF_H/2;
+
+  drainageChannels=[]; frameBottomHalves=[];
+
+  for(var i=0;i<NUM_FF;i++){
+    var fx=startX+i*(FF_W+BEE_SPACE);
+    // Top bar
+    ffGroup.add(new THREE.Mesh(new THREE.BoxGeometry(FF_W+8,5,FF_L+8),MWAX).translateX(fx).translateY(Y_SUPER+SUPER_H-5));
+    // Top half
+    ffGroup.add(new THREE.Mesh(new THREE.BoxGeometry(FF_W,FF_H/2,FF_L),MWAX).translateX(fx).translateY(frameMidY+FF_H/4));
+    // Bottom half
+    var bh=new THREE.Mesh(new THREE.BoxGeometry(FF_W,FF_H/2-0.5,FF_L),MAMB);
+    bh.position.set(fx,frameMidY-FF_H/4,0);bh.userData.baseZ=0;
+    ffGroup.add(bh); frameBottomHalves.push(bh);
+    // Split line
+    ffGroup.add(new THREE.Mesh(new THREE.BoxGeometry(FF_W+0.5,0.5,FF_L+0.5),M(0x805010,0.3)).translateX(fx).translateY(frameMidY));
+    // Key slot
+    ffGroup.add(new THREE.Mesh(new THREE.BoxGeometry(4,8,2),MKS).translateX(fx).translateY(frameMidY-FF_H/2+10).translateZ(FF_L/2+1));
+    // Drainage channels (hidden)
+    for(var d=0;d<3;d++){
+      var dr=new THREE.Mesh(new THREE.CylinderGeometry(1,1,FF_H/2,8),new THREE.MeshStandardMaterial({color:0xc87010,transparent:true,opacity:0.6,roughness:0.4}));
+      dr.position.set(fx,frameMidY-FF_H/4,-FF_L/4+d*(FF_L/4));
+      dr.visible=false; ffGroup.add(dr); drainageChannels.push(dr);
+    }
+  }
+
+  // Flow key (hidden)
+  var fk=new THREE.Mesh(new THREE.BoxGeometry(4,8,30),MFK);
+  fk.position.set(startX,frameMidY-FF_H/2+10,FF_L/2+10);
+  fk.visible=false; ffGroup.add(fk); flowKey=fk;
+
+  g.add(ffGroup);
+  flowFrameGroup = ffGroup;
+
+  // Collection trough at bottom of super
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(FF_L,8,10),MATRF).translateY(Y_SUPER+5));
+
+  // Harvest outlet spout — FROM FRONT
+  var spout=new THREE.Mesh(new THREE.CylinderGeometry(HARVEST_SPOUT_R,HARVEST_SPOUT_R,35,16),MWDK);
+  spout.rotation.x=Math.PI/2;
+  spout.position.set(0,Y_SUPER+5, SUPER_D/2+17);
+  g.add(spout);
+  // Flange
+  var fl=new THREE.Mesh(new THREE.CylinderGeometry(HARVEST_SPOUT_R+4,HARVEST_SPOUT_R+4,3,16),MWDK);
+  fl.rotation.x=Math.PI/2;
+  fl.position.set(0,Y_SUPER+5, SUPER_D/2+1.5);
+  g.add(fl);
+
+  // Inner cover on top — semi-transparent so feeder lines visible from above
+  var coverMat = M(0x7a5535, 0.8, 0.05, {transparent: true, opacity: 0.35, depthWrite: false});
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(SUPER_W-4,COVER_T,SUPER_D-4), coverMat).translateY(Y_COVER+COVER_T/2));
+
+  // Wireframe
+  var se=new THREE.EdgesGeometry(new THREE.BoxGeometry(SUPER_W,SUPER_H,SUPER_D));
+  g.add(new THREE.LineSegments(se,new THREE.LineBasicMaterial({color:0x6b4020,opacity:0.25,transparent:true})).translateY(Y_SUPER+SUPER_H/2));
+
+  scene.add(g); superGroup=g; moduleGroups.super=g;
+
+  // Store feeder group reference
+  feederGroup = moduleGroups.feeder || null;
+}
+
+// ============================================================
+// MODULE 7 — TELESCOPING ROOF
+// ============================================================
+function createRoof(){
+  var g=new THREE.Group(); g.name='roof';
+  var rimH=ROOF_H-TIN_T, rimT=10;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ROOF_W,rimH,rimT),MC).translateY(Y_ROOF+rimH/2).translateZ(ROOF_D/2-rimT/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ROOF_W,rimH,rimT),MC).translateY(Y_ROOF+rimH/2).translateZ(-ROOF_D/2+rimT/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(rimT,rimH,ROOF_D-2*rimT),MC).translateX(-ROOF_W/2+rimT/2).translateY(Y_ROOF+rimH/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(rimT,rimH,ROOF_D-2*rimT),MC).translateX(ROOF_W/2-rimT/2).translateY(Y_ROOF+rimH/2));
+  // Inner board
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ROOF_W-2*rimT+4,8,ROOF_D-2*rimT+4),MCOV).translateY(Y_ROOF+rimH-4));
+  // Tin top
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ROOF_W+6,TIN_T,ROOF_D+6),MTIN).translateY(Y_ROOF+ROOF_H-TIN_T/2));
+  // Tin bent edges
+  var bendH=8;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ROOF_W+6,bendH,TIN_T),MTIN).translateY(Y_ROOF+ROOF_H-bendH/2).translateZ(ROOF_D/2+3));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(ROOF_W+6,bendH,TIN_T),MTIN).translateY(Y_ROOF+ROOF_H-bendH/2).translateZ(-ROOF_D/2-3));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(TIN_T,bendH,ROOF_D+6),MTIN).translateX(-ROOF_W/2-3).translateY(Y_ROOF+ROOF_H-bendH/2));
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(TIN_T,bendH,ROOF_D+6),MTIN).translateX(ROOF_W/2+3).translateY(Y_ROOF+ROOF_H-bendH/2));
+  // Vent holes
+  for(var v=-1;v<=1;v+=2){
+    var vh=new THREE.Mesh(new THREE.CylinderGeometry(8,8,rimT+2,16),MDARK);
+    vh.rotation.x=Math.PI/2;vh.position.set(v*100,Y_ROOF+rimH*0.7,ROOF_D/2);g.add(vh);
+  }
+  // Wireframe
+  g.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(ROOF_W,ROOF_H,ROOF_D)),new THREE.LineBasicMaterial({color:0x6b4020,opacity:0.2,transparent:true})).translateY(Y_ROOF+ROOF_H/2));
+
+  scene.add(g); roofGroup=g; moduleGroups.roof=g;
+}
+
+// ============================================================
+// HONEY DRIP PARTICLES (from front spout)
+// ============================================================
+function createHoneyParticles(){
+  var arr=[];
+  var sy=Y_SUPER+5, sz=SUPER_D/2+35;
+  for(var i=0;i<12;i++){
+    var m=new THREE.Mesh(new THREE.SphereGeometry(1.5+Math.random()*1.5,8,8),new THREE.MeshStandardMaterial({color:0xe8a020,roughness:0.2,transparent:true,opacity:0.8,metalness:0.1}));
+    m.visible=false;m.userData={velocity:0,delay:i*0.15,elapsed:0,baseX:(Math.random()-0.5)*6,baseY:sy,baseZ:sz};
+    m.position.set(m.userData.baseX,sy,sz);
+    scene.add(m);arr.push(m);
+  }
+  return arr;
+}
+
+// ============================================================
+// GROUND
+// ============================================================
+function addGround(){
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(3000,3000),new THREE.MeshStandardMaterial({color:0xe8e0d0,roughness:0.95})).rotateX(-Math.PI/2).translateY(-2));
+  // Shadow blob
+  var sc=document.createElement('canvas');sc.width=256;sc.height=256;
+  var sx=sc.getContext('2d');var gr=sx.createRadialGradient(128,128,0,128,128,128);
+  gr.addColorStop(0,'rgba(60,40,20,0.25)');gr.addColorStop(0.5,'rgba(60,40,20,0.1)');gr.addColorStop(1,'rgba(60,40,20,0)');
+  sx.fillStyle=gr;sx.fillRect(0,0,256,256);
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(700,600),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc),transparent:true,depthWrite:false})).rotateX(-Math.PI/2).translateY(-1).translateZ(30));
+}
+
+// ============================================================
+// BUILD
+// ============================================================
+createFloorBoard();
+createBroodBox();
+createInsulation();
+createWindowAssembly();
+createFeeder();
+createFlowSuper();
+createRoof();
+addGround();
+honeyParticles=createHoneyParticles();
+
+for(var k in moduleGroups) moduleGroups[k].userData.basePos=moduleGroups[k].position.clone();
+
+// ============================================================
+// HOVER RAYCASTING
+// ============================================================
+var raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2(), hovMod=null;
+var hoverLabel=document.getElementById('hover-label');
+var origEmissive=new Map();
+
+function modForObj(o){var c=o;while(c){if(c.name&&moduleNames[c.name])return c.name;c=c.parent}return null}
+function hlMod(n,on){
+  var g=moduleGroups[n];if(!g)return;
+  g.traverse(function(ch){
+    if(ch.isMesh&&ch.material&&ch.material.emissive){
+      if(on){if(!origEmissive.has(ch.uuid))origEmissive.set(ch.uuid,ch.material.emissive.getHex());ch.material.emissive.setHex(0x2a1a08);ch.material.emissiveIntensity=0.6}
+      else{ch.material.emissive.setHex(origEmissive.get(ch.uuid)||0);ch.material.emissiveIntensity=0;origEmissive.delete(ch.uuid)}
+    }
+  });
+}
+renderer.domElement.addEventListener('mousemove',function(e){
+  mouse.x=(e.clientX/window.innerWidth)*2-1;mouse.y=-(e.clientY/window.innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  var hits=raycaster.intersectObjects(scene.children,true),nw=null;
+  for(var j=0;j<hits.length;j++){var m=modForObj(hits[j].object);if(m){nw=m;break}}
+  if(nw!==hovMod){if(hovMod)hlMod(hovMod,false);if(nw)hlMod(nw,true);hovMod=nw}
+  if(hovMod){hoverLabel.textContent=moduleNames[hovMod];hoverLabel.style.opacity='1';hoverLabel.style.left=(e.clientX+14)+'px';hoverLabel.style.top=(e.clientY-14)+'px';renderer.domElement.style.cursor='pointer'}
+  else{hoverLabel.style.opacity='0';renderer.domElement.style.cursor='grab'}
+});
+renderer.domElement.addEventListener('mouseleave',function(){if(hovMod){hlMod(hovMod,false);hovMod=null}hoverLabel.style.opacity='0';renderer.domElement.style.cursor='grab'});
+
+// ============================================================
+// UI CONTROLS
+// ============================================================
+function togBtn(b,a,on,off){b.querySelector('.btn-label').textContent=a?on:off;if(a)b.classList.add('active');else b.classList.remove('active')}
+
+document.getElementById('btn-shutter').addEventListener('click',function(){
+  shutterOpen=!shutterOpen;
+  // Shutter slides in Z direction (along left wall) to reveal acrylic
+  shutterTarget=shutterOpen?SHUTTER_TRAVEL:0;
+  togBtn(this,shutterOpen,'Close Shutter','Open Shutter');
+  showTooltip(shutterOpen?'Shutter open — acrylic window visible':'Shutter closed');
+});
+
+document.getElementById('btn-harvest').addEventListener('click',function(){
+  harvestMode=!harvestMode;
+  harvestTarget=harvestMode?1.5:0;
+  drainageChannels.forEach(function(d){d.visible=harvestMode});
+  if(flowKey)flowKey.visible=harvestMode;
+  honeyParticles.forEach(function(p){p.visible=false;p.userData.elapsed=0;p.userData.velocity=0});
+  togBtn(this,harvestMode,'Reset Harvest','Activate Harvest');
+  showTooltip(harvestMode?'Harvest mode — cells opening, honey flows from front':'Harvest reset');
+});
+
+document.getElementById('btn-xps').addEventListener('click',function(){
+  xpsVisible=!xpsVisible;if(xpsGroup)xpsGroup.visible=xpsVisible;
+  togBtn(this,xpsVisible,'Hide Insulation','Show Insulation');
+  showTooltip(xpsVisible?'Inner insulation shown':'Insulation hidden');
+});
+
+document.getElementById('btn-super').addEventListener('click',function(){
+  superVisible=!superVisible;if(superGroup)superGroup.visible=superVisible;
+  togBtn(this,superVisible,'Hide Flow Super','Show Flow Super');
+  showTooltip(superVisible?'Flow super shown':'Super hidden');
+});
+
+document.getElementById('btn-roof').addEventListener('click',function(){
+  roofVisible=!roofVisible;if(roofGroup)roofGroup.visible=roofVisible;
+  togBtn(this,roofVisible,'Hide Roof','Show Roof');
+  showTooltip(roofVisible?'Roof shown':'Roof hidden');
+});
+
+document.getElementById('btn-feeder').addEventListener('click',function(){
+  feederActive=!feederActive;
+  syrupParticles.forEach(function(p){p.visible=false;p.userData.elapsed=0;p.userData.phase=0});
+  togBtn(this,feederActive,'Stop Feeding','Show Feeding');
+  showTooltip(feederActive?'Syrup flowing from funnel into internal tray':'Feeder stopped');
+});
+
+document.getElementById('btn-explode').addEventListener('click',function(){
+  explodedView=!explodedView;explodeT=explodedView?1:0;
+  togBtn(this,explodedView,'Assembled View','Exploded View');
+  showTooltip(explodedView?'Exploded view':'Assembled');
+});
+
+document.getElementById('btn-frames').addEventListener('click',function(){
+  framesVisible=!framesVisible;
+  if(flowFrameGroup) flowFrameGroup.visible=framesVisible;
+  togBtn(this,framesVisible,'Hide Flow Frames','Show Flow Frames');
+  showTooltip(framesVisible?'Flow frames shown':'Flow frames hidden — super box visible');
+});
+
+document.getElementById('btn-feeder-vis').addEventListener('click',function(){
+  feederVisible=!feederVisible;
+  if(moduleGroups.feeder) moduleGroups.feeder.visible=feederVisible;
+  togBtn(this,feederVisible,'Hide Feeder','Show Feeder');
+  showTooltip(feederVisible?'Feeder shown':'Feeder hidden');
+});
+
+// Camera
+var camP={
+  default:{pos:[750,450,700],tgt:[0,200,0]},
+  front:{pos:[0,250,800],tgt:[0,200,0]},
+  left:{pos:[-800,250,0],tgt:[0,200,0]},
+  back:{pos:[BWIN_OFFSET_X,250,-700],tgt:[BWIN_OFFSET_X,Y_BROOD+BWIN_FROM_BOTTOM+BWIN_H/2,-BROOD_D/2]},
+  top:{pos:[0,900,50],tgt:[0,200,0]},
+  window:{pos:[-650,Y_BROOD+WIN_FROM_BOTTOM+WIN_H/2,0],tgt:[-BROOD_W/2,Y_BROOD+WIN_FROM_BOTTOM+WIN_H/2,0]}
+};
+function animCam(n){var p=camP[n];if(!p)return;cameraFrom.copy(camera.position);cameraTo.set(p.pos[0],p.pos[1],p.pos[2]);camTargetFrom.copy(controls.target);camTargetTo.set(p.tgt[0],p.tgt[1],p.tgt[2]);cameraT=0;cameraAnimating=true;document.querySelectorAll('.cam-btn').forEach(function(b){b.classList.remove('active-cam')});var el=document.getElementById('cam-'+n);if(el)el.classList.add('active-cam')}
+document.getElementById('cam-default').addEventListener('click',function(){animCam('default')});
+document.getElementById('cam-front').addEventListener('click',function(){animCam('front')});
+document.getElementById('cam-back').addEventListener('click',function(){animCam('back')});
+document.getElementById('cam-left').addEventListener('click',function(){animCam('left')});
+document.getElementById('cam-top').addEventListener('click',function(){animCam('top')});
+document.getElementById('cam-window').addEventListener('click',function(){animCam('window')});
+document.getElementById('cam-orbit').addEventListener('click',function(){
+  autoRotate=!autoRotate;
+  controls.autoRotate=autoRotate;
+  controls.autoRotateSpeed=1.5;
+  var el=document.getElementById('cam-orbit');
+  if(autoRotate){el.classList.add('active-cam');showTooltip('Auto-orbit enabled — click again to stop')}
+  else{el.classList.remove('active-cam');showTooltip('Auto-orbit stopped')}
+});
+
+// Tooltip
+var tooltipEl=document.getElementById('tooltip'),ttTimer;
+function showTooltip(m){tooltipEl.textContent=m;tooltipEl.classList.add('visible');clearTimeout(ttTimer);ttTimer=setTimeout(function(){tooltipEl.classList.remove('visible')},2500)}
+
+// ============================================================
+// ANIMATION
+// ============================================================
+function ease(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}
+function slerp(a,b,f){var d=b-a;return Math.abs(d)<0.001?b:a+d*f}
+
+var clock=new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  var dt=clock.getDelta();
+
+  // Left wall shutter slides in Z
+  shutterPos=slerp(shutterPos,shutterTarget,0.06);
+  if(shutterMesh) shutterMesh.position.z = -shutterPos;
+  // Back wall shutter slides in X
+  if(backShutterMesh) backShutterMesh.position.x = BWIN_OFFSET_X + shutterPos;
+
+  // Feeder syrup animation
+  if(feederActive){
+    syrupParticles.forEach(function(p){
+      p.userData.elapsed += dt;
+      if(p.userData.elapsed < p.userData.delay) return;
+      p.visible = true;
+      p.userData.phase += dt * p.userData.speed;
+      var ph = p.userData.phase % 1;
+      if(ph < 0.3){
+        // Phase 1: Drop down funnel
+        var t = ph / 0.3;
+        p.position.set(p.userData.startX, p.userData.startY - t * (p.userData.startY - p.userData.tubeY), (Math.random()-0.5)*2);
+      } else if(ph < 0.7){
+        // Phase 2: Travel along tube (horizontal)
+        var t = (ph - 0.3) / 0.4;
+        var fromX = p.userData.tubeStartX;
+        var toX = p.userData.tubeEndX;
+        p.position.set(fromX + (toX - fromX) * t, p.userData.tubeY, (Math.random()-0.5)*2);
+      } else {
+        // Phase 3: Drop into tray
+        var t = (ph - 0.7) / 0.3;
+        p.position.set(p.userData.endX, p.userData.tubeY - t * (p.userData.tubeY - p.userData.endY), (Math.random()-0.5)*2);
+      }
+    });
+  } else {
+    syrupParticles.forEach(function(p){if(p.visible){p.visible=false;p.userData.phase=0;p.userData.elapsed=0}});
+  }
+
+  // Harvest
+  harvestShift=slerp(harvestShift,harvestTarget,0.06);
+  frameBottomHalves.forEach(function(m){m.position.z=m.userData.baseZ+harvestShift});
+
+  // Explode
+  explodeP=slerp(explodeP,explodeT,0.05);
+  for(var k in moduleGroups){
+    var g=moduleGroups[k],off=explodeOffsets[k];
+    if(off&&g.userData.basePos){
+      g.position.x=g.userData.basePos.x+off.x*explodeP;
+      g.position.y=g.userData.basePos.y+off.y*explodeP;
+      g.position.z=g.userData.basePos.z+off.z*explodeP;
+    }
+  }
+
+  // Honey particles (from front spout)
+  if(harvestMode&&superVisible){
+    var t=clock.getElapsedTime();
+    honeyParticles.forEach(function(p,i){
+      p.userData.elapsed+=dt;
+      if(p.userData.elapsed>p.userData.delay){
+        p.visible=true;p.userData.velocity+=120*dt;
+        p.position.y-=p.userData.velocity*dt;
+        p.position.x=p.userData.baseX+Math.sin(t*2+i)*1.5;
+        if(p.position.y<-50){p.position.y=p.userData.baseY;p.userData.velocity=Math.random()*10;p.userData.delay=Math.random()*0.3;p.userData.elapsed=0}
+      }
+    });
+  }else{
+    honeyParticles.forEach(function(p){if(p.visible){p.visible=false;p.position.y=p.userData.baseY;p.userData.velocity=0;p.userData.elapsed=0}});
+  }
+
+  // Camera
+  if(cameraAnimating){cameraT+=dt*1.2;if(cameraT>=1){cameraT=1;cameraAnimating=false}var e=ease(cameraT);camera.position.lerpVectors(cameraFrom,cameraTo,e);controls.target.lerpVectors(camTargetFrom,camTargetTo,e)}
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+animate();
+
+// Resize
+window.addEventListener('resize',function(){camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight)});
+
+// Dismiss loading
+setTimeout(function(){
+  if(typeof dismissLoading==='function')dismissLoading();
+  else{var el=document.getElementById('loading');if(el){el.classList.add('fade');setTimeout(function(){el.remove()},700)}}
+  showTooltip('Use mouse to orbit · scroll to zoom · right-click to pan');
+},800);
+
+}catch(err){
+  console.error('Beehive init error:',err);
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#2a1a08;color:#f0c060;padding:24px;border-radius:12px;font:14px/1.5 system-ui;max-width:600px;z-index:10000;text-align:center';
+  d.innerHTML='<strong>Error</strong><br><br>'+err.message+'<br><br><small style="color:#aaa">Press F12 for details</small>';
+  document.body.appendChild(d);
+  if(typeof dismissLoading==='function')dismissLoading();
+}
+</script>
+</body>
+</html>
