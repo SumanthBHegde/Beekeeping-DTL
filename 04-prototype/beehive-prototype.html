@@ -51,12 +51,7 @@
   .ctrl-btn.active .toggle-track .toggle-thumb { left: 17px; background: #f0c060; box-shadow: 0 0 8px rgba(240,192,96,0.5); }
   .ctrl-btn .btn-label { flex: 1; pointer-events: none; }
 
-  .dim-block { border-top: 1px solid rgba(255,200,100,0.1); padding-top: 12px; margin-top: 4px; }
-  .dim-block h3 { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(192,160,96,0.8); margin-bottom: 8px; }
-  .dim-block ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-  .dim-block li { font-size: 11px; color: rgba(255,255,255,0.6); display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
-  .dim-block li .label { color: rgba(255,255,255,0.5); }
-  .dim-block li .value { color: rgba(255,255,255,0.35); font-size: 10px; font-weight: 500; }
+
 
   #tooltip { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-4px); background: rgba(22,18,14,0.88); color: #f0c060; font-size: 12px; font-weight: 500; padding: 8px 18px; border-radius: 24px; pointer-events: none; opacity: 0; transition: opacity 0.4s, transform 0.4s; z-index: 200; backdrop-filter: blur(8px); border: 1px solid rgba(255,200,100,0.1); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
   #tooltip.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -92,29 +87,14 @@ setTimeout(dismissLoading,10000);
   </div>
   <div class="btn-group">
     <button class="ctrl-btn" id="btn-shutter"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Open Shutter</span></button>
-    <button class="ctrl-btn" id="btn-harvest"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Activate Harvest</span></button>
-    <button class="ctrl-btn" id="btn-feeder"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Show Feeding</span></button>
     <button class="ctrl-btn active" id="btn-xps"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Insulation</span></button>
     <button class="ctrl-btn active" id="btn-super"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Flow Super</span></button>
-    <button class="ctrl-btn active" id="btn-frames"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Flow Frames</span></button>
-    <button class="ctrl-btn active" id="btn-feeder-vis"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Feeder</span></button>
     <button class="ctrl-btn active" id="btn-roof"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Roof</span></button>
+    <button class="ctrl-btn active" id="btn-frames"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Flow Frames</span></button>
+    <button class="ctrl-btn" id="btn-harvest"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Activate Harvest</span></button>
+    <button class="ctrl-btn active" id="btn-feeder-vis"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Feeder</span></button>
+    <button class="ctrl-btn" id="btn-feeder"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Show Feeding</span></button>
     <button class="ctrl-btn" id="btn-explode"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Exploded View</span></button>
-  </div>
-  <div class="dim-block">
-    <h3>ISI Standard Dimensions</h3>
-    <ul>
-      <li><span class="label">Brood box (ext.)</span><span class="value">505 × 405 × 245 mm</span></li>
-      <li><span class="label">Brood box (int.)</span><span class="value">465 × 365 × 245 mm</span></li>
-      <li><span class="label">Super (ext.)</span><span class="value">505 × 405 × 150 mm</span></li>
-      <li><span class="label">Wall</span><span class="value">20 mm</span></li>
-      <li><span class="label">Insulation</span><span class="value">10 mm (inner)</span></li>
-      <li><span class="label">Bee space</span><span class="value">9 mm</span></li>
-      <li><span class="label">Left window</span><span class="value">200 × 140 mm</span></li>
-      <li><span class="label">Back window</span><span class="value">180 × 120 mm</span></li>
-      <li><span class="label">Flow frame</span><span class="value">340 × 48 × 140 mm</span></li>
-      <li><span class="label">Brood box</span><span class="value">Empty (no frames)</span></li>
-    </ul>
   </div>
 </div>
 
@@ -221,6 +201,7 @@ let frameBottomHalves = [], drainageChannels = [], flowKey = null;
 let xpsGroup = null, superGroup = null, roofGroup = null;
 let feederGroup = null, flowFrameGroup = null;
 let honeyParticles = [];
+let beakerMesh = null, honeyPoolMesh = null;
 let syrupParticles = [];
 
 const moduleGroups = {};
@@ -697,6 +678,25 @@ function createRoof(){
 function createHoneyParticles(){
   var arr=[];
   var sy=Y_SUPER+5, sz=SUPER_D/2+35;
+
+  // Beaker to catch honey
+  var beakerGeometry = new THREE.CylinderGeometry(20, 20, 50, 32, 1, true); // Open top
+  var beakerMat = new THREE.MeshStandardMaterial({color: 0xffffff, transparent: true, opacity: 0.25, roughness: 0.1, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false});
+  beakerMesh = new THREE.Group();
+  var beakerBody = new THREE.Mesh(beakerGeometry, beakerMat);
+  beakerMesh.add(beakerBody);
+  var beakerBase = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 2, 32), beakerMat);
+  beakerBase.position.set(0, -24, 0);
+  beakerMesh.add(beakerBase);
+  // Honey pool inside beaker
+  honeyPoolMesh = new THREE.Mesh(new THREE.CylinderGeometry(19, 19, 40, 32).translate(0,20,0), new THREE.MeshStandardMaterial({color: 0xd08020, transparent: true, opacity: 0.85, roughness: 0.2}));
+  honeyPoolMesh.position.set(0, -23, 0);
+  honeyPoolMesh.scale.y = 0.01;
+  beakerMesh.add(honeyPoolMesh);
+  beakerMesh.position.set(0, 25, sz);
+  beakerMesh.visible = false;
+  scene.add(beakerMesh);
+
   for(var i=0;i<12;i++){
     var m=new THREE.Mesh(new THREE.SphereGeometry(1.5+Math.random()*1.5,8,8),new THREE.MeshStandardMaterial({color:0xe8a020,roughness:0.2,transparent:true,opacity:0.8,metalness:0.1}));
     m.visible=false;m.userData={velocity:0,delay:i*0.15,elapsed:0,baseX:(Math.random()-0.5)*6,baseY:sy,baseZ:sz};
@@ -780,6 +780,8 @@ document.getElementById('btn-harvest').addEventListener('click',function(){
   harvestTarget=harvestMode?1.5:0;
   drainageChannels.forEach(function(d){d.visible=harvestMode});
   if(flowKey)flowKey.visible=harvestMode;
+  if(beakerMesh) beakerMesh.visible=harvestMode;
+  if(!harvestMode && honeyPoolMesh) honeyPoolMesh.scale.y = 0.01;
   honeyParticles.forEach(function(p){p.visible=false;p.userData.elapsed=0;p.userData.velocity=0});
   togBtn(this,harvestMode,'Reset Harvest','Activate Harvest');
   showTooltip(harvestMode?'Harvest mode — cells opening, honey flows from front':'Harvest reset');
@@ -929,7 +931,11 @@ function animate(){
         p.visible=true;p.userData.velocity+=120*dt;
         p.position.y-=p.userData.velocity*dt;
         p.position.x=p.userData.baseX+Math.sin(t*2+i)*1.5;
-        if(p.position.y<-50){p.position.y=p.userData.baseY;p.userData.velocity=Math.random()*10;p.userData.delay=Math.random()*0.3;p.userData.elapsed=0}
+        var bottomY = 10;
+        if(p.position.y<bottomY){
+          p.position.y=p.userData.baseY;p.userData.velocity=Math.random()*10;p.userData.delay=Math.random()*0.3;p.userData.elapsed=0;
+          if(honeyPoolMesh && honeyPoolMesh.scale.y < 1) honeyPoolMesh.scale.y += 0.005;
+        }
       }
     });
   }else{
