@@ -113,8 +113,17 @@ Directory structure:
     │   ├── 03-concept-notes/
     │   │   ├── README.md
     │   │   └── top-concepts.md
-    │   └── 04-selection-matrix/
-    │       ├── evaluation.md
+    │   ├── 04-selection-matrix/
+    │   │   ├── evaluation.md
+    │   │   └── README.md
+    │   ├── 05-storyboarding/
+    │   │   ├── README.md
+    │   │   └── assets/
+    │   └── 06-innovation-and-impact/
+    │       ├── 01-innovation-details.md
+    │       ├── 02-social-impact.md
+    │       ├── 03-biological-impact.md
+    │       ├── 04-economic-impact.md
     │       └── README.md
     ├── 04-prototype/
     │   ├── prototype-versions/
@@ -172,6 +181,8 @@ Ideation phase deliverables:
 - **02-dot-voting/**: Voting results to prioritize ideas.
 - **03-concept-notes/**: Top concept details.
 - **04-selection-matrix/**: Evaluation criteria and final concept selection.
+- **05-storyboarding/**: Visual storytelling of the user journey before and after the proposed design.
+- **06-innovation-and-impact/**: Detailed analysis of the project's innovation and its projected social, biological, and economic impact.
 
 ### 04-prototype/
 
