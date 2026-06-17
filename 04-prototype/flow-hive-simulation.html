@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Flow Hive Harvest Simulation — Auto-Harvest Super with Single Tap</title>
+<meta name="description" content="Standalone interactive 3D simulation of the simplified auto-harvest flow super: single output pipe, transparent flow section, per-frame isolation valves and gravity-tilt harvest." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f5f0e8; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  #canvas-container { width: 100vw; height: 100vh; display: block; position: relative; }
+  canvas { display: block; }
+
+  #ui-panel {
+    position: fixed; bottom: 20px; left: 20px;
+    background: rgba(22,18,14,0.92); border-radius: 16px; padding: 20px;
+    color: #fff; min-width: 280px; max-width: 320px; z-index: 100;
+    backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid rgba(255,200,100,0.12);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 1px 0 rgba(255,200,100,0.06) inset;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-height: calc(100vh - 40px); overflow-y: auto;
+  }
+  #ui-panel:hover { transform: translateY(-2px); }
+  #ui-panel::-webkit-scrollbar { width: 4px; }
+  #ui-panel::-webkit-scrollbar-thumb { background: rgba(240,192,96,0.3); border-radius: 2px; }
+
+  .panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,200,100,0.15); }
+  .panel-header .hive-icon { width: 28px; height: 28px; background: linear-gradient(135deg, #f0c060, #c87010); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .panel-header h2 { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #f0c060; line-height: 1.3; }
+  .panel-header h2 span { display: block; font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.45); letter-spacing: 0.03em; margin-top: 2px; }
+
+  .group-label { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(240,192,96,0.55); margin: 14px 0 6px; }
+  .group-label:first-of-type { margin-top: 0; }
+  .btn-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+  .ctrl-btn {
+    background: rgba(92,48,16,0.6); color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,200,100,0.08); border-radius: 8px;
+    padding: 8px 12px; font-size: 12px; font-weight: 500; cursor: pointer;
+    text-align: left; transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    font-family: inherit; display: flex; align-items: center; gap: 10px;
+    position: relative; overflow: hidden;
+  }
+  .ctrl-btn::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(240,192,96,0.08), transparent); opacity: 0; transition: opacity 0.2s; }
+  .ctrl-btn:hover { background: rgba(122,64,24,0.7); border-color: rgba(255,200,100,0.18); transform: translateX(2px); }
+  .ctrl-btn:hover::before { opacity: 1; }
+  .ctrl-btn:active { transform: translateX(2px) scale(0.98); }
+  .ctrl-btn .step-num { width: 18px; height: 18px; border-radius: 50%; background: rgba(240,192,96,0.18); color: #f0c060; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ctrl-btn.active .step-num { background: #f0c060; color: #2a1a08; }
+  .ctrl-btn .toggle-track { width: 32px; height: 16px; border-radius: 8px; background: rgba(90,64,48,0.8); flex-shrink: 0; position: relative; transition: background 0.3s; border: 1px solid rgba(255,200,100,0.1); }
+  .ctrl-btn .toggle-track .toggle-thumb { width: 12px; height: 12px; border-radius: 50%; background: rgba(180,140,100,0.6); position: absolute; top: 1px; left: 1px; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  .ctrl-btn.active .toggle-track { background: rgba(200,135,16,0.5); border-color: rgba(240,192,96,0.3); }
+  .ctrl-btn.active .toggle-track .toggle-thumb { left: 17px; background: #f0c060; box-shadow: 0 0 8px rgba(240,192,96,0.5); }
+  .ctrl-btn .btn-label { flex: 1; pointer-events: none; }
+  .ctrl-btn.action { justify-content: center; background: rgba(60,40,24,0.6); }
+
+  .frame-count { display: flex; gap: 5px; }
+  .fc-btn { flex: 1; background: rgba(92,48,16,0.6); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,200,100,0.08); border-radius: 8px; padding: 7px 0; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+  .fc-btn:hover { background: rgba(122,64,24,0.7); color: #f0c060; }
+  .fc-btn.active-fc { background: rgba(200,135,16,0.4); color: #f0c060; border-color: rgba(240,192,96,0.35); }
+
+  .hint { font-size: 10px; color: rgba(255,255,255,0.45); line-height: 1.5; margin-top: 8px; }
+  .hint b { color: rgba(240,192,96,0.8); font-weight: 600; }
+
+  #tooltip { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-4px); background: rgba(22,18,14,0.88); color: #f0c060; font-size: 12px; font-weight: 500; padding: 8px 18px; border-radius: 24px; pointer-events: none; opacity: 0; transition: opacity 0.4s, transform 0.4s; z-index: 200; backdrop-filter: blur(8px); border: 1px solid rgba(255,200,100,0.1); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+  #tooltip.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #caption { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); max-width: 540px; width: calc(100% - 380px); min-width: 280px; background: rgba(22,18,14,0.82); color: rgba(255,255,255,0.85); font-size: 12px; line-height: 1.5; padding: 12px 18px; border-radius: 12px; z-index: 90; backdrop-filter: blur(10px); border: 1px solid rgba(255,200,100,0.12); text-align: center; transition: opacity 0.3s; }
+  #caption b { color: #f0c060; }
+
+  #hover-label { position: fixed; pointer-events: none; background: rgba(22,18,14,0.85); color: #f0c060; font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 6px; opacity: 0; transition: opacity 0.15s; z-index: 150; backdrop-filter: blur(6px); border: 1px solid rgba(255,200,100,0.1); white-space: nowrap; letter-spacing: 0.03em; }
+
+  #loading { position: fixed; inset: 0; background: #f5f0e8; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.6s; }
+  #loading.fade { opacity: 0; pointer-events: none; }
+  #loading .spinner { width: 40px; height: 40px; border: 3px solid rgba(200,135,16,0.2); border-top-color: #c87010; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+  #loading p { color: #8b5e3c; font-size: 13px; font-weight: 500; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #camera-presets { position: fixed; top: 20px; right: 20px; display: flex; gap: 6px; z-index: 100; flex-wrap: wrap; justify-content: flex-end; }
+  .cam-btn { background: rgba(22,18,14,0.75); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,200,100,0.1); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.2s; backdrop-filter: blur(8px); }
+  .cam-btn:hover { background: rgba(92,48,16,0.8); color: #f0c060; border-color: rgba(255,200,100,0.25); transform: translateY(-1px); }
+  .cam-btn.active-cam { background: rgba(200,135,16,0.3); color: #f0c060; border-color: rgba(240,192,96,0.3); }
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><p>Building flow hive…</p></div>
+<script>
+window.__loadingDismissed=false;
+function dismissLoading(){if(window.__loadingDismissed)return;window.__loadingDismissed=true;var el=document.getElementById('loading');if(el){el.classList.add('fade');setTimeout(function(){if(el&&el.parentNode)el.remove()},700)}}
+setTimeout(dismissLoading,10000);
+</script>
+
+<div id="canvas-container"></div>
+
+<div id="ui-panel">
+  <div class="panel-header">
+    <div class="hive-icon">🍯</div>
+    <h2>Flow Hive Harvest<span>Concept 4 · Auto-Harvest Super with Single Tap</span></h2>
+  </div>
+
+  <div class="group-label">Harvest Sequence</div>
+  <div class="btn-group">
+    <button class="ctrl-btn" id="btn-key"><span class="step-num">1</span><span class="btn-label">Insert Flow Key</span></button>
+    <button class="ctrl-btn" id="btn-twist"><span class="step-num">2</span><span class="btn-label">Twist &amp; Open Cells</span></button>
+    <button class="ctrl-btn" id="btn-tilt"><span class="step-num">3</span><span class="btn-label">Tilt to Harvest</span></button>
+    <button class="ctrl-btn action" id="btn-reset"><span class="btn-label">↺ Reset Harvest</span></button>
+  </div>
+
+  <div class="group-label">Frames (smaller colonies → fewer)</div>
+  <div class="frame-count" id="frame-count">
+    <button class="fc-btn" data-n="5">5</button>
+    <button class="fc-btn" data-n="6">6</button>
+    <button class="fc-btn active-fc" data-n="7">7</button>
+    <button class="fc-btn" data-n="8">8</button>
+  </div>
+
+  <div class="group-label">View</div>
+  <div class="btn-group">
+    <button class="ctrl-btn active" id="btn-box"><span class="toggle-track"><span class="toggle-thumb"></span></span><span class="btn-label">Hide Super Box</span></button>
+  </div>
+
+  <div class="hint">💡 <b>Click any frame</b> to open/close its isolation valve. Closed frames keep their honey; only open frames drain through the single pipe.</div>
+</div>
+
+<div id="camera-presets">
+  <button class="cam-btn active-cam" id="cam-default">Default</button>
+  <button class="cam-btn" id="cam-front">Front</button>
+  <button class="cam-btn" id="cam-side">Side</button>
+  <button class="cam-btn" id="cam-top">Top</button>
+  <button class="cam-btn" id="cam-cells">Cells</button>
+  <button class="cam-btn" id="cam-orbit">Orbit</button>
+</div>
+
+<div id="tooltip">Use mouse to orbit · scroll to zoom · right-click to pan</div>
+<div id="caption">This is the <b>auto-harvest super</b>. Follow the 3 steps to harvest honey without opening the hive or disturbing the bees.</div>
+<div id="hover-label"></div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+try {
+
+// ============================================================
+// DIMENSIONS (flow super only — ISI super footprint)
+// ============================================================
+const SUPER_W = 505, SUPER_D = 405, SUPER_H = 150, WALL = 20;
+const BEE_SPACE = 9;
+const FF_W = 48, FF_L = 340, FF_H = 140;   // shortened flow frames
+const HARVEST_SPOUT_R = 7;
+
+const BROOD_W = 505, BROOD_D = 405, BROOD_H = 250;  // brood chamber (colony) below the super
+const STAND_H = 230;                        // single-pole stand height (ground → brood floor)
+const Y_BROOD = STAND_H;                    // bottom of brood box
+const Y_SUPER = Y_BROOD + BROOD_H;          // flow super sits ON TOP of the brood chamber
+const FRAME_MID_Y = Y_SUPER + SUPER_H/2;    // vertical centre of frames
+const FRAME_BOT_Y = FRAME_MID_Y - FF_H/2;   // bottom of frames
+const MANIFOLD_Y = Y_SUPER - 12;            // single output pipe, just below frames
+const MANIFOLD_Z = 130;                     // toward the front of the super
+const TAP_Z = SUPER_D/2 + 26;               // front tap exit
+
+// ============================================================
+// STATE
+// ============================================================
+let NUM_FF = 7;
+let keyInserted = false, cellsOpen = false, tilted = false;
+let boxVisible = true, autoRotate = false;
+
+let harvestShift = 0, harvestTarget = 0;     // cell-split Z offset
+let tiltAngle = 0, tiltTarget = 0;           // gravity tilt (radians)
+let fillLevel = 0;                            // transparent-section honey fill 0..1
+let bottleFill = 0;                           // bottle honey pool 0..1
+
+let drainageChannels = [], valves = [];
+let frameOpen = [];                           // per-frame valve open state
+let frameDrips = [];                          // honey droplets inside frames/manifold
+let tapDrips = [];                            // droplets falling from tap into jar
+let combCups = [];                            // hexagon 'cup' halves on the frames (slide down to open)
+
+let hiveGroup = null, plumbingGroup = null, wallsGroup = null;
+let standGroup = null, broodGroup = null, waterMesh = null;
+let flowKey = null, transparentHoney = null, honeyPoolMesh = null;
+let detailGroup = null, detailKey = null, detailCup = null, detailDrips = [];
+let keyTurn = 0, keyTurnTarget = 0;           // flow-key quarter-turn
+
+let cameraAnimating = false, cameraT = 0;
+const cameraFrom = new THREE.Vector3(), cameraTo = new THREE.Vector3();
+const camTargetFrom = new THREE.Vector3(), camTargetTo = new THREE.Vector3();
+
+// ============================================================
+// RENDERER + SCENE
+// ============================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+try { renderer.outputColorSpace = THREE.SRGBColorSpace; } catch(e){}
+try { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1; } catch(e){}
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#f5f0e8');
+scene.fog = new THREE.Fog(0xf5f0e8, 2500, 4500);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 1, 5000);
+camera.position.set(820, 600, 820);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 380, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 200;
+controls.maxDistance = 3200;
+controls.update();
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xd0c4a0, 0.35));
+scene.add(new THREE.HemisphereLight(0xffe8c0, 0xc0a880, 0.4));
+const sun = new THREE.DirectionalLight(0xffe8c0, 1.6);
+sun.position.set(600,900,400); scene.add(sun);
+const fill = new THREE.DirectionalLight(0xfff0d8, 0.2);
+fill.position.set(-400,200,-300); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffd080, 0.3);
+rim.position.set(-200,400,600); scene.add(rim);
+
+// ============================================================
+// MATERIALS
+// ============================================================
+function M(c,r,m,o){r=r!=null?r:0.7;m=m!=null?m:0.05;o=o||{};return new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:r,metalness:m},o))}
+function woodTex(base,grain){
+  var c=document.createElement('canvas');c.width=256;c.height=128;
+  var x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,256,128);
+  x.globalAlpha=0.15;x.strokeStyle=grain;
+  for(var i=0;i<50;i++){x.beginPath();x.lineWidth=0.5+Math.random()*1.5;var y=Math.random()*128;x.moveTo(0,y);for(var j=0;j<256;j+=10)x.lineTo(j,y+Math.sin(j*0.02+i)*3+(Math.random()-0.5)*2);x.stroke()}
+  x.globalAlpha=1;var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
+}
+const MCL = new THREE.MeshStandardMaterial({color:0xa06835,roughness:0.75,metalness:0.02,map:woodTex('#a06835','#704a22')});
+const MSF = M(0xa06835,0.75,0.05,{transparent:true,opacity:0.16,depthWrite:false});
+const MWAX = M(0xf0e080,0.6);
+const MAMB = M(0xe0a030,0.5);
+const MWDK = M(0x5c3010,0.85);
+const MFK  = M(0xc8a040,0.3,0.5);          // flow key (gold)
+const MKS  = M(0x222222,0.9);               // key slot
+const MPIPE = M(0x6b4a28,0.6,0.1);          // opaque pipe / manifold (HDPE-ish)
+const MGLASS = M(0xbfe0ee,0.08,0.05,{transparent:true,opacity:0.26,depthWrite:false}); // clear pipe section
+const MHONEY = M(0xd08020,0.2,0.0,{transparent:true,opacity:0.88});
+const MBOTTLE = M(0xd0e8f0,0.1,0.0,{transparent:true,opacity:0.38,depthWrite:false});
+const MPOLE = M(0x6b4a28,0.8,0.02,{map:woodTex('#6b4a28','#4a3018')});  // single-pole stand / platform
+const MWAXC = M(0xf0d870,0.5,0.0,{transparent:true,opacity:0.92,side:THREE.DoubleSide});   // comb cell — cap (top half)
+const MAMBC = M(0xe6a828,0.45,0.0,{transparent:true,opacity:0.96,side:THREE.DoubleSide});  // comb cell — cup (honey-filled bottom half)
+const MWATER = M(0x5bb8e0,0.1,0.0,{transparent:true,opacity:0.55});                         // donut tray water (ant moat / bee water ring)
+const MRIM = M(0xe07818,0.5,0.0);                                                           // bright ant-barrier rim
+
+// ============================================================
+// STATIC STRUCTURE: legs, walls, front pipe + transparent section, tap, bottle
+// ============================================================
+function buildStatic(){
+  hiveGroup = new THREE.Group();            // brood + super + plumbing (tilts during harvest)
+  scene.add(hiveGroup);
+  standGroup = new THREE.Group();           // single-pole stand + ant moat (fixed to the ground)
+  scene.add(standGroup);
+
+  buildStand();
+  buildBrood();
+
+  // Super walls (translucent so internals read clearly)
+  wallsGroup = new THREE.Group();
+  wallsGroup.add(new THREE.Mesh(new THREE.BoxGeometry(SUPER_W,SUPER_H,WALL),MSF).translateY(Y_SUPER+SUPER_H/2).translateZ(-SUPER_D/2+WALL/2)); // back
+  wallsGroup.add(new THREE.Mesh(new THREE.BoxGeometry(SUPER_W,SUPER_H,WALL),MSF).translateY(Y_SUPER+SUPER_H/2).translateZ(SUPER_D/2-WALL/2));  // front
+  wallsGroup.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,SUPER_H,SUPER_D),MSF).translateX(-SUPER_W/2+WALL/2).translateY(Y_SUPER+SUPER_H/2)); // left
+  wallsGroup.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,SUPER_H,SUPER_D),MSF).translateX(SUPER_W/2-WALL/2).translateY(Y_SUPER+SUPER_H/2));  // right
+  // base floor of super
+  wallsGroup.add(new THREE.Mesh(new THREE.BoxGeometry(SUPER_W,WALL/2,SUPER_D),MSF).translateY(Y_SUPER+WALL/4));
+  // edge wireframe (always visible outline)
+  wallsGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(SUPER_W,SUPER_H,SUPER_D)), new THREE.LineBasicMaterial({color:0x6b4020,opacity:0.3,transparent:true})).translateY(Y_SUPER+SUPER_H/2));
+  hiveGroup.add(wallsGroup);
+
+  // ---- Forward pipe (manifold centre → front tap), with transparent section ----
+  var pipeR = 9;
+  // segment from manifold to start of glass
+  hiveGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(pipeR,pipeR,(TAP_Z-MANIFOLD_Z)*0.35,16).rotateX(Math.PI/2), MPIPE)
+    .translateY(MANIFOLD_Y).translateZ(MANIFOLD_Z + (TAP_Z-MANIFOLD_Z)*0.175));
+  // transparent inspection section (Concept-4: confirm flow by eye)
+  var glassLen = (TAP_Z-MANIFOLD_Z)*0.35;
+  var glassZ = MANIFOLD_Z + (TAP_Z-MANIFOLD_Z)*0.52;
+  hiveGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(pipeR+1.5,pipeR+1.5,glassLen,20).rotateX(Math.PI/2), MGLASS)
+    .translateY(MANIFOLD_Y).translateZ(glassZ));
+  // honey visible inside transparent section (length scales with flow)
+  transparentHoney = new THREE.Mesh(new THREE.CylinderGeometry(pipeR-1,pipeR-1,glassLen,16).rotateX(Math.PI/2), MHONEY);
+  transparentHoney.position.set(0, MANIFOLD_Y, glassZ);
+  transparentHoney.scale.z = 0.001;
+  hiveGroup.add(transparentHoney);
+  // tap body + flange + valve handle
+  hiveGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(HARVEST_SPOUT_R,HARVEST_SPOUT_R,40,16).rotateX(Math.PI/2), MWDK)
+    .translateY(MANIFOLD_Y).translateZ(TAP_Z-2));
+  hiveGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(HARVEST_SPOUT_R+5,HARVEST_SPOUT_R+5,3,16).rotateX(Math.PI/2), MWDK)
+    .translateY(MANIFOLD_Y).translateZ(MANIFOLD_Z + (TAP_Z-MANIFOLD_Z)*0.72));
+  // downward nozzle so honey drips into the jar
+  hiveGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(HARVEST_SPOUT_R-1,HARVEST_SPOUT_R-2,22,12), MWDK)
+    .translateY(MANIFOLD_Y-13).translateZ(TAP_Z+14));
+  // clear drop-hose carrying honey from the high tap down to the jar on the ground
+  var hoseTopY = MANIFOLD_Y-24, hoseBotY = 150, hoseH = hoseTopY-hoseBotY;
+  hiveGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(5,5,hoseH,12), MGLASS).translateY((hoseTopY+hoseBotY)/2).translateZ(TAP_Z+14));
+
+  // ---- Collection jar (world space, on the ground in front of the stand) ----
+  var jar = new THREE.Group();
+  jar.add(new THREE.Mesh(new THREE.CylinderGeometry(40,40,150,28,1,true), new THREE.MeshStandardMaterial({color:0xd0e8f0,roughness:0.1,metalness:0.0,transparent:true,opacity:0.32,side:THREE.DoubleSide,depthWrite:false})));
+  jar.add(new THREE.Mesh(new THREE.CylinderGeometry(40,40,3,28), MBOTTLE).translateY(-73));
+  jar.add(new THREE.Mesh(new THREE.CylinderGeometry(16,22,20,20), MBOTTLE).translateY(83)); // neck
+  honeyPoolMesh = new THREE.Mesh(new THREE.CylinderGeometry(38,38,140,28).translate(0,70,0), MHONEY);
+  honeyPoolMesh.position.set(0,-72,0);
+  honeyPoolMesh.scale.y = 0.001;
+  jar.add(honeyPoolMesh);
+  jar.position.set(0, 77, TAP_Z + 14);
+  scene.add(jar);
+}
+
+// ============================================================
+// SINGLE-POLE STAND + DONUT ANT-BARRIER / BEE WATER RING
+// ============================================================
+function buildStand(){
+  // ground base foot
+  standGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(70,92,18,24), MPOLE).translateY(9));
+  // single central pole
+  var poleR = 26;
+  standGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(poleR,poleR+3,Y_BROOD-6,20), MPOLE).translateY((Y_BROOD-6)/2+6));
+  // top platform the hive rests on
+  standGroup.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W+40,16,BROOD_D+40), MPOLE).translateY(Y_BROOD-8));
+  // ---- donut water tray around the pole: liquid moat stops climbing ants ----
+  var donutY = Y_BROOD*0.46, ringR = poleR+46, tubeR = 22;
+  standGroup.add(new THREE.Mesh(new THREE.TorusGeometry(ringR, tubeR, 16, 40).rotateX(Math.PI/2), MRIM).translateY(donutY));
+  // water surface inside the trough
+  waterMesh = new THREE.Mesh(new THREE.RingGeometry(poleR+4, ringR+tubeR-6, 40).rotateX(-Math.PI/2), MWATER);
+  waterMesh.position.set(0, donutY+9, 0);
+  standGroup.add(waterMesh);
+  // bright outer landing rim (bees drink here; colour = refill reminder)
+  standGroup.add(new THREE.Mesh(new THREE.TorusGeometry(ringR+tubeR-4, 4, 12, 40).rotateX(Math.PI/2), MRIM).translateY(donutY+tubeR-5));
+}
+
+// ============================================================
+// BROOD CHAMBER (colony box) — sits under the flow super
+// ============================================================
+function buildBrood(){
+  broodGroup = new THREE.Group();
+  var y = Y_BROOD;
+  broodGroup.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W,BROOD_H,WALL),MCL).translateY(y+BROOD_H/2).translateZ(-BROOD_D/2+WALL/2)); // back
+  broodGroup.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W,BROOD_H,WALL),MCL).translateY(y+BROOD_H/2).translateZ(BROOD_D/2-WALL/2));  // front
+  broodGroup.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,BROOD_H,BROOD_D),MCL).translateX(-BROOD_W/2+WALL/2).translateY(y+BROOD_H/2)); // left
+  broodGroup.add(new THREE.Mesh(new THREE.BoxGeometry(WALL,BROOD_H,BROOD_D),MCL).translateX(BROOD_W/2-WALL/2).translateY(y+BROOD_H/2));  // right
+  broodGroup.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W,WALL,BROOD_D),MCL).translateY(y+WALL/2));                                   // floor
+  // entrance landing board (front, bottom)
+  broodGroup.add(new THREE.Mesh(new THREE.BoxGeometry(300,8,50),MPOLE).translateY(y+10).translateZ(BROOD_D/2+18));
+  // queen-excluder hint between brood and super
+  broodGroup.add(new THREE.Mesh(new THREE.BoxGeometry(BROOD_W-30,3,BROOD_D-30),M(0xb0b8c0,0.4,0.4,{transparent:true,opacity:0.5})).translateY(Y_SUPER-2));
+  broodGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(BROOD_W,BROOD_H,BROOD_D)), new THREE.LineBasicMaterial({color:0x5a3a20,opacity:0.35,transparent:true})).translateY(y+BROOD_H/2));
+  hiveGroup.add(broodGroup);
+}
+
+// ============================================================
+// FRAMES + DOWN-TUBES + MANIFOLD + VALVES  (rebuilt on count change)
+// ============================================================
+function buildFrames(n){
+  // remove previous plumbing group
+  if(plumbingGroup){ hiveGroup.remove(plumbingGroup); disposeGroup(plumbingGroup); }
+  plumbingGroup = new THREE.Group();
+  plumbingGroup.name = 'plumbing';
+
+  NUM_FF = n;
+  combCups = []; drainageChannels = []; valves = [];
+  frameDrips = []; frameOpen = [];
+
+  var totalFS = NUM_FF*FF_W + (NUM_FF+1)*BEE_SPACE;
+  var startX = -totalFS/2 + BEE_SPACE + FF_W/2;
+
+  // ---- single output pipe (manifold) running left→right under the frames ----
+  plumbingGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(9,9,totalFS+20,16).rotateZ(Math.PI/2), MPIPE)
+    .translateY(MANIFOLD_Y).translateZ(MANIFOLD_Z));
+  // elbow joining manifold centre to the forward pipe
+  plumbingGroup.add(new THREE.Mesh(new THREE.SphereGeometry(10,16,12), MPIPE).translateY(MANIFOLD_Y).translateZ(MANIFOLD_Z));
+
+  for(var i=0;i<NUM_FF;i++){
+    var fx = startX + i*(FF_W+BEE_SPACE);
+    frameOpen.push(true);
+
+    var fg = new THREE.Group();             // one frame
+    fg.userData.frameIndex = i;
+
+    // top bar (holds the flow-key slot)
+    fg.add(tagFrame(new THREE.Mesh(new THREE.BoxGeometry(FF_W+8,6,FF_L+8),MWDK).translateX(fx).translateY(Y_SUPER+SUPER_H-4), i));
+    // translucent comb body (gives the frame depth)
+    fg.add(tagFrame(new THREE.Mesh(new THREE.BoxGeometry(FF_W,FF_H,FF_L-2), M(0xead060,0.55,0,{transparent:true,opacity:0.28,depthWrite:false})).translateX(fx).translateY(FRAME_MID_Y), i));
+    // hexagonal honeycomb on the FRONT face — caps fixed, cups slide DOWN to split the cells
+    var comb = makeComb(FF_W-2, FF_H-10, 7.5);
+    comb.root.position.set(fx, FRAME_MID_Y, FF_L/2 + 1);
+    fg.add(comb.root);
+    combCups.push(comb.cup);
+    // key slot (front)
+    fg.add(new THREE.Mesh(new THREE.BoxGeometry(4,8,2),MKS).translateX(fx).translateY(FRAME_MID_Y-FF_H/2+10).translateZ(FF_L/2+1));
+
+    // drainage channels (revealed when cells open)
+    var chans = [];
+    for(var d=0;d<3;d++){
+      var dr = new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,FF_H/2,8), M(0xc87010,0.4,0.0,{transparent:true,opacity:0.7}));
+      dr.position.set(fx, FRAME_MID_Y-FF_H/4, -FF_L/4 + d*(FF_L/4));
+      dr.visible = false; fg.add(dr); drainageChannels.push(dr); chans.push(dr);
+    }
+
+    // down-tube from frame front-bottom into the manifold
+    var tubeTop = FRAME_BOT_Y, tubeBot = MANIFOLD_Y, tubeH = tubeTop - tubeBot;
+    plumbingGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(4,4,tubeH,12), MPIPE)
+      .translateX(fx).translateY((tubeTop+tubeBot)/2).translateZ(MANIFOLD_Z));
+
+    // isolation valve handle on the down-tube (clickable target sits on the whole frame)
+    var valMat = M(0x40c060,0.4,0.2);       // green = open
+    var valve = new THREE.Mesh(new THREE.BoxGeometry(22,5,5), valMat);
+    valve.position.set(fx, (tubeTop+tubeBot)/2, MANIFOLD_Z);
+    valve.userData = { mat: valMat, channels: chans, frameIndex: i };
+    plumbingGroup.add(valve); valves.push(valve);
+
+    plumbingGroup.add(fg);
+
+    // honey droplet pool for this frame (drains down the tube)
+    for(var p=0;p<3;p++){
+      var dropMat = M(0xe8a020,0.2,0.1,{transparent:true,opacity:0.85});
+      var drop = new THREE.Mesh(new THREE.SphereGeometry(2+Math.random()*1.2,8,8), dropMat);
+      drop.visible = false;
+      drop.userData = { frameIndex:i, fx:fx, top:tubeTop+FF_H/4, vel:0, delay:Math.random()*0.8, elapsed:0 };
+      drop.position.set(fx, drop.userData.top, MANIFOLD_Z);
+      plumbingGroup.add(drop); frameDrips.push(drop);
+    }
+  }
+
+  // flow key (hidden until inserted)
+  flowKey = new THREE.Mesh(new THREE.BoxGeometry(5,10,34), MFK);
+  flowKey.position.set(startX, FRAME_MID_Y-FF_H/2+10, FF_L/2+14);
+  flowKey.visible = false;
+  plumbingGroup.add(flowKey);
+
+  hiveGroup.add(plumbingGroup);
+  applyValveVisuals();
+}
+
+function tagFrame(mesh, idx){ mesh.userData.frameIndex = idx; return mesh; }
+
+function disposeGroup(g){
+  g.traverse(function(o){ if(o.geometry) o.geometry.dispose(); if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(function(m){m.dispose()}); } });
+}
+
+function applyValveVisuals(){
+  valves.forEach(function(v,i){
+    var open = frameOpen[i];
+    v.userData.mat.color.set(open ? 0x40c060 : 0xc04040);
+    v.rotation.z = open ? 0 : Math.PI/2;     // open = inline, closed = across
+    v.userData.channels.forEach(function(ch){ ch.visible = cellsOpen && open; });
+  });
+}
+
+// ============================================================
+// HONEY POOL DROPLETS FROM TAP (world space, into bottle)
+// ============================================================
+function buildTapDrips(){
+  var tapLocal = new THREE.Vector3(0, MANIFOLD_Y-24, TAP_Z+14);
+  for(var i=0;i<10;i++){
+    var m = new THREE.Mesh(new THREE.SphereGeometry(2+Math.random()*1.4,8,8), M(0xe8a020,0.2,0.1,{transparent:true,opacity:0.85}));
+    m.visible = false;
+    m.userData = { vel:0, delay:i*0.12, elapsed:0, jitter:(Math.random()-0.5)*5 };
+    scene.add(m); tapDrips.push(m);
+  }
+  return tapLocal;
+}
+
+// ============================================================
+// HEXAGON COMB CELLS (the inner working of a flow frame)
+// Each pointy-top hexagon is split at its equator into a fixed
+// "cap" (top half) and a "cup" (bottom half). Turning the flow key
+// slides every cup DOWN — breaking the sealed hexagons into open
+// vertical channels so honey drains; sliding back re-assembles them.
+// ============================================================
+function makeComb(areaW, areaH, R){
+  var root = new THREE.Group();
+  var cap = new THREE.Group();   // top halves — stay put
+  var cup = new THREE.Group();   // bottom halves — slide down to open
+  var w = Math.sqrt(3)/2*R;
+  var colStep = Math.sqrt(3)*R, rowStep = 1.5*R;
+  var cols = Math.max(1, Math.round(areaW/colStep));
+  var rows = Math.max(2, Math.round(areaH/rowStep));
+  var x0 = -((cols-1)*colStep)/2, y0 = -((rows-1)*rowStep)/2;
+
+  var capShape = new THREE.Shape();
+  capShape.moveTo(-w,0); capShape.lineTo(-w,R/2); capShape.lineTo(0,R); capShape.lineTo(w,R/2); capShape.lineTo(w,0); capShape.lineTo(-w,0);
+  var cupShape = new THREE.Shape();
+  cupShape.moveTo(-w,0); cupShape.lineTo(-w,-R/2); cupShape.lineTo(0,-R); cupShape.lineTo(w,-R/2); cupShape.lineTo(w,0); cupShape.lineTo(-w,0);
+  var capGeo = new THREE.ShapeGeometry(capShape), cupGeo = new THREE.ShapeGeometry(cupShape);
+
+  for(var r=0;r<rows;r++){
+    for(var c=0;c<cols;c++){
+      var cx = x0 + c*colStep + (r%2)*(colStep/2);
+      var cy = y0 + r*rowStep;
+      if(Math.abs(cx) > areaW/2 + 0.5) continue;
+      cap.add(new THREE.Mesh(capGeo, MWAXC).translateX(cx).translateY(cy));
+      cup.add(new THREE.Mesh(cupGeo, MAMBC).translateX(cx).translateY(cy));
+    }
+  }
+  cup.userData.openAmt = R*0.95;     // slide distance when fully open
+  root.add(cap); root.add(cup);
+  return { root:root, cap:cap, cup:cup };
+}
+
+// canvas text label as a plane
+function makeLabel(text, w, h, color){
+  var c=document.createElement('canvas'); c.width=512; c.height=Math.max(32,Math.round(512*h/w));
+  var x=c.getContext('2d'); x.clearRect(0,0,c.width,c.height);
+  x.fillStyle=color||'#f0c060'; x.font='bold 40px Inter, system-ui, sans-serif'; x.textAlign='center'; x.textBaseline='middle';
+  x.fillText(text, c.width/2, c.height/2);
+  var tex=new THREE.CanvasTexture(c);
+  return new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
+}
+
+// ============================================================
+// MAGNIFIED CELL-MECHANISM DETAIL (to the left of the hive)
+// ============================================================
+function buildCellDetail(){
+  detailGroup = new THREE.Group();
+  detailGroup.position.set(-(SUPER_W/2 + 360), Y_SUPER - 50, 80);
+  // backboard
+  detailGroup.add(new THREE.Mesh(new THREE.BoxGeometry(310,380,10), M(0x2a1c10,0.85,0,{transparent:true,opacity:0.5,depthWrite:false})).translateZ(-30));
+  // titles
+  var t1=makeLabel('FLOW FRAME · CELL MECHANISM',290,30); t1.position.set(0,172,0); detailGroup.add(t1);
+  var t2=makeLabel('turn key → hexagons split → honey drains',290,18,'#cbb58a'); t2.position.set(0,-178,0); detailGroup.add(t2);
+  // big comb (caps fixed, cup slides on twist)
+  var comb = makeComb(240, 250, 22);
+  comb.root.position.set(0,-6,0);
+  detailGroup.add(comb.root);
+  detailCup = comb.cup;
+  // flow key (turns 90° on twist)
+  detailKey = new THREE.Group();
+  detailKey.add(new THREE.Mesh(new THREE.CylinderGeometry(6,6,96,8).rotateZ(Math.PI/2), MFK));
+  detailKey.add(new THREE.Mesh(new THREE.BoxGeometry(46,11,11), MFK).translateX(-66));
+  detailKey.position.set(72, 150, 32);
+  detailGroup.add(detailKey);
+  // collection lip
+  detailGroup.add(new THREE.Mesh(new THREE.BoxGeometry(260,10,34), MPIPE).translateY(-152).translateZ(2));
+  // honey droplets falling through the opened channels
+  for(var k=0;k<14;k++){
+    var drop = new THREE.Mesh(new THREE.SphereGeometry(3+Math.random()*1.5,8,8), M(0xe0941c,0.2,0.1,{transparent:true,opacity:0.9}));
+    drop.visible=false;
+    drop.userData={ x:(Math.random()-0.5)*210, top:130, vel:0, delay:Math.random()*1.3, elapsed:0 };
+    drop.position.set(drop.userData.x, drop.userData.top, 6);
+    detailGroup.add(drop); detailDrips.push(drop);
+  }
+  scene.add(detailGroup);
+}
+
+// ============================================================
+// BUILD SCENE
+// ============================================================
+addGround();
+buildStatic();
+buildFrames(NUM_FF);
+buildCellDetail();
+const tapLocal = buildTapDrips();
+
+function addGround(){
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(3000,3000),new THREE.MeshStandardMaterial({color:0xe8e0d0,roughness:0.95})).rotateX(-Math.PI/2).translateY(-2));
+  var sc=document.createElement('canvas');sc.width=256;sc.height=256;
+  var sx=sc.getContext('2d');var gr=sx.createRadialGradient(128,128,0,128,128,128);
+  gr.addColorStop(0,'rgba(60,40,20,0.25)');gr.addColorStop(0.5,'rgba(60,40,20,0.1)');gr.addColorStop(1,'rgba(60,40,20,0)');
+  sx.fillStyle=gr;sx.fillRect(0,0,256,256);
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(800,700),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc),transparent:true,depthWrite:false})).rotateX(-Math.PI/2).translateY(-1));
+}
+
+// ============================================================
+// RAYCAST — click a frame to toggle its valve
+// ============================================================
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const hoverLabel = document.getElementById('hover-label');
+
+function pickFrame(ev){
+  pointer.x = (ev.clientX/window.innerWidth)*2 - 1;
+  pointer.y = -(ev.clientY/window.innerHeight)*2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  var hits = raycaster.intersectObjects(plumbingGroup.children, true);
+  for(var i=0;i<hits.length;i++){
+    var o = hits[i].object;
+    while(o && o.userData.frameIndex===undefined && o.parent) o = o.parent;
+    if(o && o.userData.frameIndex!==undefined) return o.userData.frameIndex;
+  }
+  return -1;
+}
+
+renderer.domElement.addEventListener('click', function(ev){
+  var idx = pickFrame(ev);
+  if(idx<0) return;
+  frameOpen[idx] = !frameOpen[idx];
+  applyValveVisuals();
+  showTooltip('Frame '+(idx+1)+' valve '+(frameOpen[idx]?'OPEN — will drain':'CLOSED — isolated'));
+});
+
+renderer.domElement.addEventListener('mousemove', function(ev){
+  var idx = pickFrame(ev);
+  if(idx>=0){
+    renderer.domElement.style.cursor='pointer';
+    hoverLabel.textContent='Frame '+(idx+1)+' · valve '+(frameOpen[idx]?'open':'closed');
+    hoverLabel.style.left=(ev.clientX+14)+'px'; hoverLabel.style.top=(ev.clientY+14)+'px'; hoverLabel.style.opacity='1';
+  } else {
+    renderer.domElement.style.cursor=''; hoverLabel.style.opacity='0';
+  }
+});
+
+// ============================================================
+// UI
+// ============================================================
+function togBtn(b,on){ b.classList.toggle('active',on); }
+function activeFrameCount(){ var c=0; frameOpen.forEach(function(o){if(o)c++}); return c; }
+
+function updateCaption(){
+  var el=document.getElementById('caption');
+  var msg;
+  if(!keyInserted){
+    msg='<b>Step 1 — Insert the flow key.</b> No smoke, no lifting frames, no opening the brood nest. The key turns the cells from the front.';
+  } else if(!cellsOpen){
+    msg='<b>Step 2 — Twist to open the cells.</b> The key shifts the comb: every hexagon splits at its middle and the lower halves drop, breaking the sealed cells into open vertical channels. Open the <b>Cells</b> view (top-right) to watch the mechanism.';
+  } else if(!tilted){
+    msg='<b>Step 3 — Tilt slightly to harvest.</b> All open frames drain into <b>one shared output pipe</b>; honey runs by gravity to a <b>single front tap</b>.';
+  } else {
+    msg='Harvesting <b>'+activeFrameCount()+' of '+NUM_FF+' frames</b>. Watch the <b>transparent section</b> confirm flow before it fills the bottle. Click frames to isolate them.';
+  }
+  el.innerHTML=msg;
+}
+
+document.getElementById('btn-key').addEventListener('click', function(){
+  keyInserted=!keyInserted;
+  if(flowKey) flowKey.visible=keyInserted;
+  if(!keyInserted){ // pulling the key cancels downstream steps
+    setCells(false); setTilt(false);
+    togBtn(document.getElementById('btn-twist'),false);
+    togBtn(document.getElementById('btn-tilt'),false);
+  }
+  togBtn(this,keyInserted);
+  showTooltip(keyInserted?'Flow key inserted':'Flow key removed');
+  updateCaption();
+});
+
+document.getElementById('btn-twist').addEventListener('click', function(){
+  if(!keyInserted){ // auto-insert key first
+    keyInserted=true; if(flowKey) flowKey.visible=true; togBtn(document.getElementById('btn-key'),true);
+  }
+  setCells(!cellsOpen);
+  if(!cellsOpen){ setTilt(false); togBtn(document.getElementById('btn-tilt'),false); }
+  togBtn(this,cellsOpen);
+  showTooltip(cellsOpen?'Cells opened — drainage channels formed':'Cells closed');
+  updateCaption();
+});
+
+document.getElementById('btn-tilt').addEventListener('click', function(){
+  if(!cellsOpen){ showTooltip('Open the cells first (step 2)'); togBtn(this,false); return; }
+  setTilt(!tilted);
+  togBtn(this,tilted);
+  showTooltip(tilted?'Hive tilted — honey flows by gravity to the tap':'Hive level');
+  updateCaption();
+});
+
+document.getElementById('btn-reset').addEventListener('click', function(){
+  keyInserted=false; setCells(false); setTilt(false);
+  if(flowKey) flowKey.visible=false;
+  fillLevel=0; bottleFill=0;
+  if(honeyPoolMesh) honeyPoolMesh.scale.y=0.001;
+  frameDrips.forEach(function(d){d.visible=false;d.userData.vel=0;d.userData.elapsed=0});
+  tapDrips.forEach(function(d){d.visible=false;d.userData.vel=0;d.userData.elapsed=0});
+  togBtn(document.getElementById('btn-key'),false);
+  togBtn(document.getElementById('btn-twist'),false);
+  togBtn(document.getElementById('btn-tilt'),false);
+  showTooltip('Harvest reset');
+  updateCaption();
+});
+
+document.getElementById('btn-box').addEventListener('click', function(){
+  boxVisible=!boxVisible; if(wallsGroup) wallsGroup.visible=boxVisible;
+  this.querySelector('.btn-label').textContent = boxVisible ? 'Hide Super Box' : 'Show Super Box';
+  togBtn(this,boxVisible);
+  showTooltip(boxVisible?'Super box shown':'Super box hidden — plumbing visible');
+});
+
+function setCells(on){ cellsOpen=on; harvestTarget = on ? 1.6 : 0; applyValveVisuals(); }
+function setTilt(on){ tilted=on; tiltTarget = on ? 0.085 : 0; }
+
+// frame count buttons
+document.querySelectorAll('#frame-count .fc-btn').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#frame-count .fc-btn').forEach(function(x){x.classList.remove('active-fc')});
+    this.classList.add('active-fc');
+    buildFrames(parseInt(this.dataset.n,10));
+    // rebuilding resets the harvest
+    keyInserted=false; setCells(false); setTilt(false); fillLevel=0; bottleFill=0;
+    if(honeyPoolMesh) honeyPoolMesh.scale.y=0.001;
+    togBtn(document.getElementById('btn-key'),false);
+    togBtn(document.getElementById('btn-twist'),false);
+    togBtn(document.getElementById('btn-tilt'),false);
+    showTooltip(NUM_FF+' flow frames — sized for the colony');
+    updateCaption();
+  });
+});
+
+// camera presets
+var camP = {
+  default:{pos:[820,600,820],tgt:[0,380,0]},
+  front:{pos:[0,470,920],tgt:[0,360,40]},
+  side:{pos:[1000,470,0],tgt:[0,380,0]},
+  top:{pos:[0,1220,80],tgt:[0,320,0]},
+  cells:{pos:[-(SUPER_W/2+360),470,560],tgt:[-(SUPER_W/2+360),430,80]}
+};
+function animCam(n){var p=camP[n];if(!p)return;cameraFrom.copy(camera.position);cameraTo.set(p.pos[0],p.pos[1],p.pos[2]);camTargetFrom.copy(controls.target);camTargetTo.set(p.tgt[0],p.tgt[1],p.tgt[2]);cameraT=0;cameraAnimating=true;document.querySelectorAll('.cam-btn').forEach(function(b){b.classList.remove('active-cam')});var el=document.getElementById('cam-'+n);if(el)el.classList.add('active-cam')}
+document.getElementById('cam-default').addEventListener('click',function(){animCam('default')});
+document.getElementById('cam-front').addEventListener('click',function(){animCam('front')});
+document.getElementById('cam-side').addEventListener('click',function(){animCam('side')});
+document.getElementById('cam-top').addEventListener('click',function(){animCam('top')});
+document.getElementById('cam-cells').addEventListener('click',function(){animCam('cells')});
+document.getElementById('cam-orbit').addEventListener('click',function(){
+  autoRotate=!autoRotate; controls.autoRotate=autoRotate; controls.autoRotateSpeed=1.4;
+  var el=document.getElementById('cam-orbit');
+  if(autoRotate){el.classList.add('active-cam');showTooltip('Auto-orbit enabled — click again to stop')}
+  else{el.classList.remove('active-cam');showTooltip('Auto-orbit stopped')}
+});
+
+// tooltip
+var tooltipEl=document.getElementById('tooltip'),ttTimer;
+function showTooltip(m){tooltipEl.textContent=m;tooltipEl.classList.add('visible');clearTimeout(ttTimer);ttTimer=setTimeout(function(){tooltipEl.classList.remove('visible')},2500)}
+
+// ============================================================
+// TILT PIVOT (rotate hiveGroup about front-bottom edge)
+// ============================================================
+const PIVOT = new THREE.Vector3(0, Y_BROOD, BROOD_D/2);
+function applyTilt(theta){
+  hiveGroup.rotation.x = theta;
+  // keep PIVOT fixed in world: pos = PIVOT - Rx(theta)*PIVOT
+  var c=Math.cos(theta), s=Math.sin(theta);
+  var ry = PIVOT.y*c - PIVOT.z*s;
+  var rz = PIVOT.y*s + PIVOT.z*c;
+  hiveGroup.position.set(0, PIVOT.y - ry, PIVOT.z - rz);
+}
+
+// ============================================================
+// ANIMATION
+// ============================================================
+function ease(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}
+function slerp(a,b,f){var d=b-a;return Math.abs(d)<0.0001?b:a+d*f}
+var clock=new THREE.Clock();
+const _tmp = new THREE.Vector3();
+
+function animate(){
+  requestAnimationFrame(animate);
+  var dt=clock.getDelta(), t=clock.getElapsedTime();
+
+  // cell split — hexagon cups slide DOWN to break the cells open
+  harvestShift=slerp(harvestShift,harvestTarget,0.07);
+  combCups.forEach(function(g){ g.position.y = -(g.userData.openAmt||14)*harvestShift; });
+  if(detailCup) detailCup.position.y = -(detailCup.userData.openAmt||20)*harvestShift;
+
+  // flow key quarter-turn
+  keyTurnTarget = cellsOpen ? 1 : 0;
+  keyTurn = slerp(keyTurn, keyTurnTarget, 0.08);
+  if(flowKey) flowKey.rotation.z = keyTurn*Math.PI/2;
+  if(detailKey) detailKey.rotation.x = keyTurn*Math.PI/2;
+
+  // donut tray water shimmer
+  if(waterMesh) waterMesh.material.opacity = 0.5 + Math.sin(t*1.5)*0.06;
+
+  // gravity tilt
+  tiltAngle=slerp(tiltAngle,tiltTarget,0.06);
+  applyTilt(tiltAngle);
+
+  // magnified detail: honey drains through the opened channels (shown whenever cells are open)
+  if(cellsOpen){
+    detailDrips.forEach(function(d){
+      d.userData.elapsed+=dt;
+      if(d.userData.elapsed < d.userData.delay) return;
+      if(!d.visible){ d.visible=true; d.position.set(d.userData.x,d.userData.top,6); d.userData.vel=0; }
+      d.userData.vel+=180*dt; d.position.y-=d.userData.vel*dt;
+      if(d.position.y < -150){ d.visible=false; d.userData.vel=0; d.userData.delay=Math.random()*0.7; d.userData.elapsed=0; }
+    });
+  } else { detailDrips.forEach(function(d){ if(d.visible){d.visible=false;d.userData.vel=0;d.userData.elapsed=0;} }); }
+
+  var flowing = cellsOpen && tilted && activeFrameCount()>0;
+
+  // frame drips (down the channels into the manifold) — tilt with hiveGroup as children
+  frameDrips.forEach(function(d){
+    var open = frameOpen[d.userData.frameIndex];
+    if(flowing && open){
+      d.userData.elapsed += dt;
+      if(d.userData.elapsed < d.userData.delay){ d.visible=false; return; }
+      d.visible=true; d.userData.vel += 140*dt;
+      d.position.y -= d.userData.vel*dt;
+      d.position.x = d.userData.fx + Math.sin(t*3+d.userData.fx)*1.2;
+      if(d.position.y < MANIFOLD_Y){
+        d.position.y = d.userData.top; d.userData.vel=0; d.userData.delay=Math.random()*0.5; d.userData.elapsed=0;
+      }
+    } else if(d.visible){ d.visible=false; d.position.y=d.userData.top; d.userData.vel=0; d.userData.elapsed=0; }
+  });
+
+  // transparent section fill (confirm flow), then bottle
+  if(flowing){
+    fillLevel = Math.min(1, fillLevel + dt*0.6);
+  } else {
+    fillLevel = Math.max(0, fillLevel - dt*1.2);
+  }
+  if(transparentHoney) transparentHoney.scale.z = Math.max(0.001, fillLevel);
+
+  // tap drips into the bottle (world space) — only once the section has filled
+  var tapReady = flowing && fillLevel > 0.85;
+  hiveGroup.localToWorld(_tmp.copy(tapLocal));    // current world position of nozzle tip
+  tapDrips.forEach(function(d){
+    if(tapReady){
+      d.userData.elapsed += dt;
+      if(d.userData.elapsed < d.userData.delay){ return; }
+      if(!d.visible){ d.visible=true; d.position.set(_tmp.x + d.userData.jitter*0.3, _tmp.y, _tmp.z + d.userData.jitter*0.2); d.userData.vel=0; }
+      d.userData.vel += 200*dt;
+      d.position.y -= d.userData.vel*dt;
+      if(d.position.y < 150){       // reached the jar
+        d.visible=false; d.userData.vel=0; d.userData.delay=Math.random()*0.25; d.userData.elapsed=0;
+        if(honeyPoolMesh && bottleFill<1){ bottleFill=Math.min(1,bottleFill+0.006); honeyPoolMesh.scale.y=Math.max(0.001,bottleFill); }
+      }
+    } else if(d.visible){ d.visible=false; d.userData.vel=0; d.userData.elapsed=0; }
+  });
+
+  // camera
+  if(cameraAnimating){cameraT+=dt*1.2;if(cameraT>=1){cameraT=1;cameraAnimating=false}var e=ease(cameraT);camera.position.lerpVectors(cameraFrom,cameraTo,e);controls.target.lerpVectors(camTargetFrom,camTargetTo,e)}
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+updateCaption();
+animate();
+
+// resize
+window.addEventListener('resize',function(){camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight)});
+
+// dismiss loading
+setTimeout(function(){
+  dismissLoading();
+  showTooltip('Flow hive ready · follow the 3 harvest steps');
+},700);
+
+}catch(err){
+  console.error('Flow hive init error:',err);
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#2a1a08;color:#f0c060;padding:24px;border-radius:12px;font:14px/1.5 system-ui;max-width:600px;z-index:10000;text-align:center';
+  d.innerHTML='<strong>Error</strong><br><br>'+err.message+'<br><br><small style="color:#aaa">Press F12 for details</small>';
+  document.body.appendChild(d);
+  if(typeof dismissLoading==='function')dismissLoading();
+}
+</script>
+</body>
+</html>
